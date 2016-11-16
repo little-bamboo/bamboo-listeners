@@ -9,6 +9,15 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
+# User Defined:
+LOG_LEVEL = 'INFO'
+FEED_EXPORTERS = {
+ 'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
+}
+FEED_FORMAT = 'jsonlines'
+FEED_URI = "file.json"
+SEARCH_TERMS = ["clinton", "trump"]
+
 BOT_NAME = 'seattletimes'
 
 SPIDER_MODULES = ['seattletimes.spiders']

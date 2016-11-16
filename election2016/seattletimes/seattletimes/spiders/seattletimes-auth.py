@@ -1,19 +1,22 @@
 from scrapy.spiders import Spider
 import scrapy
 import json
+from scrapy.conf import settings
 
 from seattletimes.items import SeattletimesItem
 
 class SeattleTimesSpider(Spider):
 
         name='seattletimes-auth'
-        searchTerm='trump'
+        searchTerm='clinton'
         articleCount=0
-        loginURL= 'https://secure.seattletimes.com/accountcenter/login'
         filename = name + '_' + searchTerm
+        dataPath = "../../data/election2016/"
 
-        allowed_domains = ["seattletimes.com"]
-        start_urls = [loginURL]
+        settings.overrides['FEED_URI'] = dataPath + filename + ".json"
+
+        allowed_domains = ['seattletimes.com']
+        start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
         def parse(self, response):
                 return scrapy.FormRequest.from_response(
@@ -35,43 +38,39 @@ class SeattleTimesSpider(Spider):
                         # for link in links:
                         #       yield Request(url=link, callback=self.begin_scrapy)
                         #print("Existing settings: %s" % self.settings.attributes.values())
-
                         startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=20000'
                         yield scrapy.Request(url=startURL, callback=self.parseJSON)
 
-        def parseJSON(self, response):
-                #print "parseJSON response: " + str(response.body)
-                
+        def parseJSON(self, response):                
                 links = []
                 jsonresponse = json.loads(response.body_as_unicode())
 
                 if jsonresponse["hits"]["hits"]:
                         for article in jsonresponse["hits"]["hits"]:     
-                                
                                 links.append(str(article["fields"]["url"]))
 
-                #print "links: " + str(links)
-                if(links > 0):
-                        for link in links:
+                for link in links:
+                        if (link):
                                 yield scrapy.Request(url=link, callback=self.begin_scrapy)
+                        else:
+                                print "empty url, moving on..."
 
-        def begin_scrapy(self, response):
+        def begin_scrapy(self, response):   
+          
                 item=SeattletimesItem()
                 item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
                 for sel in response.xpath('//*[contains(@class, "article-header")]'):
-                        #print "sel: " , str(sel)
-                        #print "sel.xpath: " , str(sel.xpath)
-
                         item['title']=sel.xpath('h1/text()').extract()
+                        print "item['title']: " + str(item['title'])
                         item['url']=response.url
                         item['date']=sel.xpath('//time/@datetime').extract()
-  
+
                 articleContent = response.xpath('//*[contains(@id, "article-content")]')
                 for sel in articleContent:
                         item['body']=sel.xpath('//p').extract()
+                        self.articleCount += 1
+                return item
 
-                print item
-                self.articleCount += 1
 
 
