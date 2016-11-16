@@ -1,14 +1,18 @@
 from scrapy.spiders import Spider
 import json
-
-
+import sys
 
 class TimesSpider(Spider):
-        # Create name for instance that concantenates the domain with the query terms and append the current DDMMYYYY
-        # Receive arguments built using a configuration file built from the WebUI 
-        name = "timescrawler"
+
+        name='seattletimes'
+        searchTerm='trump'
+        startURLs = 'http://www.seattletimes.com/search-api?query='+searchTerm+'&page=1&perpage=20000'
+        filename = name+'_'+searchTerm
+
+        print "startURLs: " + startURLs
+
         allowed_domains = ["seattletimes.com"]
-        start_urls = ['http://www.seattletimes.com/search-api?query=trump&page=1&perpage=10000']
+        start_urls = [startURLs]
 
         def parse(self, response):
                 items=dict()
@@ -16,32 +20,29 @@ class TimesSpider(Spider):
                 jsonresponse = json.loads(response.body_as_unicode())
                 
                 for article in jsonresponse["hits"]["hits"]:
-                        print article
+                        
                         item=dict()
-                        item["index"]=index
+                        item["id"]=index
+                        item["searchIndex"]=self.filename
                         item["publish_date"]=str(article["fields"]["publish_date"])
                         item["title"]=article["fields"]["title"]
                         item["summary"]=article["fields"]["summary"]
+
                         if (item):
                                 items[index]=item
+                                print item
                         index += 1
 
-                # Create a json file with format root/article/title/date/summary
-                # ensure there are items in the list
-                # print items
-                self.createJson(items,self.name)
+                
+                print "createJson called with filename: " + self.filename
+                jsonFile = self.filename + '.json'
+                jsonPath = '../../data/election2016/'
+                jsonExport = jsonPath + jsonFile
+                with open(jsonExport, 'w') as fp:
+                        json.dump(items, fp)
 
-        # Open the file you plan to save the results to and dump the items.
-        def createJson(self, itemDict, fileName):
-                print "createJson called with filename: " + fileName
-                jsonFile = fileName + '.json'
-                with open(jsonFile, 'w') as fp:
-                        json.dump(itemDict, fp)
-
-
-
-        def loginAuth(self, user):
-                print "login called"
+        #def loginAuth(user):
+                #print "login called"
                 # Part 2 - Parse returned URL pages for detail 
                 # Part 3 - Parse comments in details pages
                 # Login Form
