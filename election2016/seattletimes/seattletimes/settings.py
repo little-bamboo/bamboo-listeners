@@ -14,7 +14,6 @@ BOT_NAME = 'seattletimes'
 SPIDER_MODULES = ['seattletimes.spiders']
 NEWSPIDER_MODULE = 'seattletimes.spiders'
 
-
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'seattletimes (+http://www.yourdomain.com)'
 
