@@ -64,6 +64,10 @@ ROBOTSTXT_OBEY = False
 #    'seattletimes.middlewares.MyCustomDownloaderMiddleware': 543,
 #}
 
+#DOWNLOADER_MIDDLEWARES = {
+#    'seattletimes.middlewares.selenium.SeleniumMiddleware': 200
+#}
+
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
 #EXTENSIONS = {

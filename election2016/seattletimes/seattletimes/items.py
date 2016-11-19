@@ -7,7 +7,6 @@
 
 import scrapy
 
-
 class SeattletimesItem(scrapy.Item):
     # define the fields for your item here like:
     # name = scrapy.Field()
@@ -16,5 +15,18 @@ class SeattletimesItem(scrapy.Item):
     body = scrapy.Field()
     date = scrapy.Field()
     url = scrapy.Field()
-    searchIndex = scrapy.Field()
+    searchIndex = scrapy.Field()	
+    articleID = scrapy.Field()
+    category = scrapy.Field()
+    authorAffiliation = scrapy.Field()
+    author = scrapy.Field()
+
     pass
+
+class CommentsItem(scrapy.Item):
+	# define the fields for your item here that will hold:
+	#	comment name, body, text, relationships, number of comments, favorites, etc.
+	comName = scrapy.Field()
+	comTitle = scrapy.Field()
+	comAuthor = scrapy.Field()
+	comDate = scrapy.Field()
