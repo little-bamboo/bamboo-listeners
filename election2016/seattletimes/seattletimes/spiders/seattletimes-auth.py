@@ -5,12 +5,10 @@ from scrapy.conf import settings
 from scrapy.utils.markup import remove_tags
 from urlparse import urlparse
 
-from scrapy.http import HtmlResponse
-
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait # available since 2.4.0
-from selenium.webdriver.support import expected_conditions as EC # available since 2.26.0
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 from seattletimes.items import SeattletimesItem
 
@@ -26,15 +24,22 @@ class SeattleTimesSpider(Spider):
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
+    headers = { 'Accept':'*/*',
+    'Accept-Encoding':'gzip, deflate, sdch',
+    'Accept-Language':'en-US,en;q=0.8',
+    'Cache-Control':'max-age=0',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
+    }
+
+    # Constructor to build the selenium-service
     def __init__(self):
-        Spider.__init__(self)
-        self.verificationErrors = []
+        self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
 
+    # Destructor method to clean up objects from memory, save settings, cache/rm elements
     def __del__(self):
-        print self.verificationErrors
-        Spider.__del__(self)
+        self.driver.quit()
 
-
+    # Entrypoint into the class that begins the event flow
     def parse(self, response):
         return scrapy.FormRequest.from_response(
                 response,
@@ -43,6 +48,7 @@ class SeattleTimesSpider(Spider):
                 callback=self.auth_login
                 )
 
+    # Obtain the response from the login and 
     def auth_login(self, response):
         #check login success before continuing
         print "auth_login response: " + str(response)
@@ -55,44 +61,53 @@ class SeattleTimesSpider(Spider):
                 # Use returned list of search URLs and iterate
                 # for link in links:
                 #       yield Request(url=link, callback=self.begin_scrapy)
-                #print("Existing settings: %s" % self.settings.attributes.values())
-                startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=5'
+                # print("Existing settings: %s" % self.settings.attributes.values())
+                startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=1'
                 yield scrapy.Request(
                         url=startURL,
                         callback=self.obtainURLs)
 
-    def obtainURLs(self, response):                
+    def obtainURLs(self, response): 
+        print "obtainURLs response: "
+        print response
+
         urls = []
         jsonresponse = json.loads(response.body_as_unicode())
 
         # For larger data sets we will need to use callback functions for jsonresponse and links
         if jsonresponse["hits"]["hits"]:
-                for article in jsonresponse["hits"]["hits"]:     
+                for article in jsonresponse["hits"]["hits"]:
+                        print str(article["fields"]["url"])   
                         urls.append(str(article["fields"]["url"]))
 
         for u in urls:
                 if (u):
                         #yield scrapy.Request(url=u, headers=self.headers, callback=self.begin_scrapy)
-                        yield scrapy.Request(url=u, callback=self.process_request)
+                        yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
                 else:
                         print "empty url, moving on..."
 
-    def process_request(self, request):
-        print webdriver
-        print request
+    def process_request(self, response):
 
-        # This is how:  yield scrapy
-        #driver = webdriver.Chrome()
-        #driver = webdriver.PhantomJS()
-        driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
-        gotten = driver.get(request.url)
-        print gotten
+        self.driver.get(response.url)
 
-        element = driver.execute_script("return $('.cheese')[0]")
-        print element
-        body = driver.page_source
-        html = HtmlResponse(driver.current_url, body=body, header=self.headers, encoding='utf-8', request=request)
-        print "html: " + html
+        # Wait here
+        #wait = WebDriverWait(self.driver, 10)
+        #print "wait"
+        #print wait
+
+        #element = wait.until(EC.element_to_be_clickable((By.ID,'showcomments')))
+        #commentScript = self.driver.execute_script("return $('.comment-count')")
+        #print "commentScript: " + str(commentScript)
+        #element = wait.until(EC.presence_of_element_located((By.ID, "showcomments")))
+        #print "element:"
+        #print element
+        #showcomments = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="showcomments"]')))
+        element = self.driver.find_element_by_xpath('//*[@id="showcomments"]/span[1]').text
+        print "element: " + str(element)
+
+        elementDriver = self.driver.ActionChains(self.driver).move_to_element(element).click(element).perform()
+        print elementDriver.text
 
     def begin_scrapy(self, response):   
 
@@ -126,16 +141,15 @@ class SeattleTimesSpider(Spider):
         item['category']=o.path.split("/")[1].encode('utf-8').strip()
 
         for sel in response.xpath('//*[contains(@id, "article-content")]'):
-                paragraphs=sel.xpath('//p').extract()
-                stripped=[]
-                for index, para in enumerate(paragraphs):
-                        # iterate through the list of paragraphs
-                        # strip the leading and following white space
-                        # once the ps are clean, 
-                        stripped += [str(remove_tags(para).encode('utf-8')).strip()]            
-                item['body']=stripped
-                # We really are only going to count 
-                self.articleCount += 1
-                self.driver.close()
-                print item
-                return item
+            paragraphs=sel.xpath('//p').extract()
+            stripped=[]
+            for index, para in enumerate(paragraphs):
+                    # iterate through the list of paragraphs
+                    # strip the leading and following white space
+                    # once the ps are clean, 
+                    stripped += [str(remove_tags(para).encode('utf-8')).strip()]            
+            item['body']=stripped
+            # We really are only going to count 
+            self.articleCount += 1
+            print item
+            return item

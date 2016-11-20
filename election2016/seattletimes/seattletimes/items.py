@@ -25,7 +25,7 @@ class SeattletimesItem(scrapy.Item):
 
 class CommentsItem(scrapy.Item):
 	# define the fields for your item here that will hold:
-	#	comment name, body, text, relationships, number of comments, favorites, etc.
+	#	comment name, body, text, relationships, number of comments,etc.
 	comName = scrapy.Field()
 	comTitle = scrapy.Field()
 	comAuthor = scrapy.Field()
