@@ -20,7 +20,7 @@ class SeattletimesItem(scrapy.Item):
     category = scrapy.Field()
     authorAffiliation = scrapy.Field()
     author = scrapy.Field()
-
+    commentNum = scrapy.Field()
     pass
 
 class CommentsItem(scrapy.Item):

@@ -1,14 +1,18 @@
 from scrapy.spiders import Spider
 import scrapy
-import json
+
 from scrapy.conf import settings
 from scrapy.utils.markup import remove_tags
+
+import json
 from urlparse import urlparse
+import re
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 
 from seattletimes.items import SeattletimesItem
 
@@ -33,14 +37,17 @@ class SeattleTimesSpider(Spider):
 
     # Constructor to build the selenium-service
     def __init__(self):
+        print "constructed"
         self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
 
     # Destructor method to clean up objects from memory, save settings, cache/rm elements
     def __del__(self):
+        print "decontstructed"
         self.driver.quit()
 
-    # Entrypoint into the class that begins the event flow
+    # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
+        print "beginning parse"
         return scrapy.FormRequest.from_response(
                 response,
 
@@ -50,22 +57,23 @@ class SeattleTimesSpider(Spider):
 
     # Obtain the response from the login and 
     def auth_login(self, response):
+        print "authorizing"
         #check login success before continuing
         print "auth_login response: " + str(response)
         #print response.body
         if 'authentication failed' in response.body:
-                self.logger.error("Login failed")
-                return
+            self.logger.error("Login failed")
+            return
         else:
-                # Create new function that return list of URLs to parse
-                # Use returned list of search URLs and iterate
-                # for link in links:
-                #       yield Request(url=link, callback=self.begin_scrapy)
-                # print("Existing settings: %s" % self.settings.attributes.values())
-                startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=1'
-                yield scrapy.Request(
-                        url=startURL,
-                        callback=self.obtainURLs)
+            # Create new function that return list of URLs to parse
+            # Use returned list of search URLs and iterate
+            # for link in links:
+            #       yield Request(url=link, callback=self.begin_scrapy)
+            # print("Existing settings: %s" % self.settings.attributes.values())
+            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=10000'
+            yield scrapy.Request(
+                    url=startURL,
+                    callback=self.obtainURLs)
 
     def obtainURLs(self, response): 
         print "obtainURLs response: "
@@ -77,7 +85,7 @@ class SeattleTimesSpider(Spider):
         # For larger data sets we will need to use callback functions for jsonresponse and links
         if jsonresponse["hits"]["hits"]:
                 for article in jsonresponse["hits"]["hits"]:
-                        print str(article["fields"]["url"])   
+                    if str(article["fields"]["url"]) > 0:
                         urls.append(str(article["fields"]["url"]))
 
         for u in urls:
@@ -89,32 +97,36 @@ class SeattleTimesSpider(Spider):
 
     def process_request(self, response):
 
+        # Wait here 
+        #wait = WebDriverWait(self.driver, 10)
+        #WebDriverWait(self.driver, 10).until(EC.title_contains("cheese!"))
+        self.driver.implicitly_wait(10) # seconds
+        
+        # Pull the url from the response and send it to the webdriver
         self.driver.get(response.url)
 
-        # Wait here
-        #wait = WebDriverWait(self.driver, 10)
-        #print "wait"
-        #print wait
+        # Process and collect comments and comment count
+        commentNumberElement = self.driver.find_element_by_id("showcomments")
+        print "commentNumberElement: " + str(commentNumberElement)
 
-        #element = wait.until(EC.element_to_be_clickable((By.ID,'showcomments')))
-        #commentScript = self.driver.execute_script("return $('.comment-count')")
-        #print "commentScript: " + str(commentScript)
-        #element = wait.until(EC.presence_of_element_located((By.ID, "showcomments")))
-        #print "element:"
-        #print element
-        #showcomments = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="showcomments"]')))
-        element = self.driver.find_element_by_xpath('//*[@id="showcomments"]/span[1]').text
-        print "element: " + str(element)
+        commentNumberElement.click()
 
-        elementDriver = self.driver.ActionChains(self.driver).move_to_element(element).click(element).perform()
-        print elementDriver.text
+        commentElement = self.driver.find_element_by_xpath('//*[@id="showcomments"]/span[1]')
+        element = re.sub(' Comments','',str(commentElement.text),1)
 
-    def begin_scrapy(self, response):   
+        item=SeattletimesItem()
+        item['commentNum']=element
+
+        #element.click()
+        #self.driver.execute_script("return <SCRIPT>")
+
+        #elementDriver = self.driver.ActionChains(self.driver).move_to_element(element).click(element).perform()
+        #print "elementDriver.text"
+        #print elementDriver.text
 
         # Construct the Model and construct the dict object assigned to the 
         # items object 'SeattletimesItem'
-
-        item=SeattletimesItem()
+        
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
         articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0].encode('utf-8').strip()
@@ -151,5 +163,11 @@ class SeattleTimesSpider(Spider):
             item['body']=stripped
             # We really are only going to count 
             self.articleCount += 1
-            print item
-            return item
+
+        print str(item)
+
+        return item
+
+
+
+    
