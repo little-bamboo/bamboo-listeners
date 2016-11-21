@@ -89,25 +89,16 @@ class SeattleTimesSpider(Spider):
 
     def process_request(self, response):
         self.driver.get(response.url)
+        self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
 
-        # Wait here
-        #wait = WebDriverWait(self.driver, 10)
-        #WebDriverWait(self.driver, 10).until(EC.title_contains("cheese!"))
-        # self.driver.implicitly_wait(20) # seconds
         print "sleeping a few seconds"
 
-        # Pull the url from the response and send it to the webdriver
-        self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
-        #self.driver.find_element_by_partial_link_text("omment").click()
-        time.sleep(3)
-
-        # Process and collect comments and comment count
-        commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
-        element = re.sub(' Comments','',str(commentElement.text),1)
+        # Wait here
+        wait = WebDriverWait(self.driver, 3)
+        wait.until(EC.presence_of_element_located((By.ID, "showcomments")))
+        #self.driver.implicitly_wait(5) # seconds
 
         item=SeattletimesItem()
-
-        item['commentNum']=element
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
         articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0].encode('utf-8').strip()
@@ -144,6 +135,11 @@ class SeattleTimesSpider(Spider):
             item['body']=stripped
             # We really are only going to count 
             self.articleCount += 1
+
+        # Process and collect comments and comment count
+        commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
+        #element = re.sub(' Comments','',str(commentElement.text),1)
+        item['commentNum']=str(commentElement.text)
 
         print str(item)
 
