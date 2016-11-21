@@ -20,11 +20,11 @@ from seattletimes.items import SeattletimesItem
 class SeattleTimesSpider(Spider):
 
     name='seattletimes-auth'
-    searchTerm='trump'
+    searchTerm='clinton'
     articleCount=0
     filename = name + '_' + searchTerm
-    dataPath = "../../data/election2016/"
-    settings.overrides['FEED_URI'] = dataPath + filename + ".json"
+    dataPath = "../../../../data/election2016/"
+    settings.overrides['FEED_URI'] = dataPath + filename + "-articles" + ".json"
 
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
@@ -39,7 +39,7 @@ class SeattleTimesSpider(Spider):
     # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         print "beginning parse"
-        self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
+        #self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
         return scrapy.FormRequest.from_response(
                 response,
 
@@ -62,7 +62,7 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=30'
+            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=15000'
             yield scrapy.Request(
                     url=startURL,
                     callback=self.obtainURLs)
@@ -82,21 +82,22 @@ class SeattleTimesSpider(Spider):
 
         for u in urls:
                 if (u):
-                        #yield scrapy.Request(url=u, headers=self.headers, callback=self.begin_scrapy)
                         yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
                 else:
                         print "empty url, moving on..."
 
     def process_request(self, response):
-        self.driver.get(response.url)
-        self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
+        #self.driver.get(response.url)
+        #self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
 
-        print "sleeping a few seconds"
+        #print "sleeping a few seconds"
 
-        # Wait here
-        wait = WebDriverWait(self.driver, 3)
-        wait.until(EC.presence_of_element_located((By.ID, "showcomments")))
-        #self.driver.implicitly_wait(5) # seconds
+        # Review docs on wait
+        # Hypothesis: Perhaps the value is contrarian to its thinking, smaller is faster?
+        #self.driver.implicitly_wait(0.1)
+
+        #TODO: REVIEW blog suggestion
+        #TODO: xhr request mining logging extraction
 
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
@@ -137,9 +138,9 @@ class SeattleTimesSpider(Spider):
             self.articleCount += 1
 
         # Process and collect comments and comment count
-        commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
+        #commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
         #element = re.sub(' Comments','',str(commentElement.text),1)
-        item['commentNum']=str(commentElement.text)
+        #item['commentNum']=str(commentElement.text)
 
         print str(item)
 
