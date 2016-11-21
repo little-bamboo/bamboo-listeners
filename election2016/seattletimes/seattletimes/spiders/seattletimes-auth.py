@@ -12,7 +12,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
+
+import time
 
 from seattletimes.items import SeattletimesItem
 
@@ -35,19 +36,10 @@ class SeattleTimesSpider(Spider):
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
     }
 
-    # Constructor to build the selenium-service
-    def __init__(self):
-        print "constructed"
-        self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
-
-    # Destructor method to clean up objects from memory, save settings, cache/rm elements
-    def __del__(self):
-        print "decontstructed"
-        self.driver.quit()
-
     # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         print "beginning parse"
+        self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
         return scrapy.FormRequest.from_response(
                 response,
 
@@ -70,7 +62,7 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=10000'
+            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=30'
             yield scrapy.Request(
                     url=startURL,
                     callback=self.obtainURLs)
@@ -96,37 +88,26 @@ class SeattleTimesSpider(Spider):
                         print "empty url, moving on..."
 
     def process_request(self, response):
-
-        # Wait here 
-        #wait = WebDriverWait(self.driver, 10)
-        #WebDriverWait(self.driver, 10).until(EC.title_contains("cheese!"))
-        self.driver.implicitly_wait(10) # seconds
-        
-        # Pull the url from the response and send it to the webdriver
         self.driver.get(response.url)
 
+        # Wait here
+        #wait = WebDriverWait(self.driver, 10)
+        #WebDriverWait(self.driver, 10).until(EC.title_contains("cheese!"))
+        # self.driver.implicitly_wait(20) # seconds
+        print "sleeping a few seconds"
+
+        # Pull the url from the response and send it to the webdriver
+        self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
+        #self.driver.find_element_by_partial_link_text("omment").click()
+        time.sleep(3)
+
         # Process and collect comments and comment count
-        commentNumberElement = self.driver.find_element_by_id("showcomments")
-        print "commentNumberElement: " + str(commentNumberElement)
-
-        commentNumberElement.click()
-
-        commentElement = self.driver.find_element_by_xpath('//*[@id="showcomments"]/span[1]')
+        commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
         element = re.sub(' Comments','',str(commentElement.text),1)
 
         item=SeattletimesItem()
+
         item['commentNum']=element
-
-        #element.click()
-        #self.driver.execute_script("return <SCRIPT>")
-
-        #elementDriver = self.driver.ActionChains(self.driver).move_to_element(element).click(element).perform()
-        #print "elementDriver.text"
-        #print elementDriver.text
-
-        # Construct the Model and construct the dict object assigned to the 
-        # items object 'SeattletimesItem'
-        
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
         articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0].encode('utf-8').strip()
