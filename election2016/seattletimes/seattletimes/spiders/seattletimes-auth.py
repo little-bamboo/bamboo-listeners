@@ -7,20 +7,16 @@ from scrapy.utils.markup import remove_tags
 import json
 from urlparse import urlparse
 import re
+import time
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
-import time
 
 from seattletimes.items import SeattletimesItem
 
 class SeattleTimesSpider(Spider):
 
     name='seattletimes-auth'
-    searchTerm='clinton'
+    searchTerm='trump'
     articleCount=0
     filename = name + '_' + searchTerm
     dataPath = "../../../../data/election2016/"
@@ -29,17 +25,22 @@ class SeattleTimesSpider(Spider):
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
-    headers = { 'Accept':'*/*',
-    'Accept-Encoding':'gzip, deflate, sdch',
-    'Accept-Language':'en-US,en;q=0.8',
-    'Cache-Control':'max-age=0',
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
+    headers = {
+        'Accept':'*/*',
+        'Accept-Encoding':'gzip, deflate, sdch',
+        'Accept-Language':'en-US,en;q=0.8',
+        'Cache-Control':'max-age=0',
+        'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
     }
 
     # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         print "beginning parse"
+
+        # Instantiate a driver object
         #self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
+
+        # Push authentication
         return scrapy.FormRequest.from_response(
                 response,
 
@@ -49,9 +50,10 @@ class SeattleTimesSpider(Spider):
 
     # Obtain the response from the login and 
     def auth_login(self, response):
-        print "authorizing"
+
         #check login success before continuing
         print "auth_login response: " + str(response)
+
         #print response.body
         if 'authentication failed' in response.body:
             self.logger.error("Login failed")
@@ -80,24 +82,23 @@ class SeattleTimesSpider(Spider):
                     if str(article["fields"]["url"]) > 0:
                         urls.append(str(article["fields"]["url"]))
 
+        # Refactor for loop to include index count.
+        # If at the end of the index, set flag to close driver self.driver.close()
         for u in urls:
+                #print "Processing url: " + u
                 if (u):
                         yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
                 else:
                         print "empty url, moving on..."
 
     def process_request(self, response):
-        #self.driver.get(response.url)
-        #self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
+        url = str(response.url)
 
-        #print "sleeping a few seconds"
-
-        # Review docs on wait
-        # Hypothesis: Perhaps the value is contrarian to its thinking, smaller is faster?
-        #self.driver.implicitly_wait(0.1)
-
-        #TODO: REVIEW blog suggestion
         #TODO: xhr request mining logging extraction
+
+        #self.driver.get(url)
+        #self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
+        #self.driver.implicitly_wait(10)
 
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
@@ -129,23 +130,23 @@ class SeattleTimesSpider(Spider):
             paragraphs=sel.xpath('//p').extract()
             stripped=[]
             for index, para in enumerate(paragraphs):
-                    # iterate through the list of paragraphs
-                    # strip the leading and following white space
-                    # once the ps are clean, 
-                    stripped += [str(remove_tags(para).encode('utf-8')).strip()]            
-            item['body']=stripped
-            # We really are only going to count 
-            self.articleCount += 1
+                    stripped += str(remove_tags(para).encode('utf-8')).strip()
 
-        # Process and collect comments and comment count
-        #commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment-count")]')
-        #element = re.sub(' Comments','',str(commentElement.text),1)
-        #item['commentNum']=str(commentElement.text)
+            item['body']=''.join(stripped)
 
+        #commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment")]')
+
+        #print "commentElement.text: " + commentElement.text
+        #element = re.sub('Comments', '', str(commentElement.text), 1).strip()
+        #item['commentNum'] = str(commentElement.text)
+        self.articleCount += 1
         print str(item)
 
         return item
 
-
-
-    
+    def testInt(self,value):
+        try:
+            val = int(value)
+            return True
+        except:
+            return False
