@@ -6,10 +6,6 @@ from scrapy.utils.markup import remove_tags
 
 import json
 from urlparse import urlparse
-import re
-import time
-
-from selenium import webdriver
 
 from seattletimes.items import SeattletimesItem
 
@@ -36,9 +32,6 @@ class SeattleTimesSpider(Spider):
     # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         print "beginning parse"
-
-        # Instantiate a driver object
-        #self.driver = webdriver.Remote("http://localhost:4444/wd/hub", webdriver.DesiredCapabilities.HTMLUNIT.copy())
 
         # Push authentication
         return scrapy.FormRequest.from_response(
@@ -96,10 +89,6 @@ class SeattleTimesSpider(Spider):
 
         #TODO: xhr request mining logging extraction
 
-        #self.driver.get(url)
-        #self.driver.execute_script("document.querySelectorAll('a#comments.article-comments-bar')")
-        #self.driver.implicitly_wait(10)
-
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
@@ -131,22 +120,10 @@ class SeattleTimesSpider(Spider):
             stripped=[]
             for index, para in enumerate(paragraphs):
                     stripped += str(remove_tags(para).encode('utf-8')).strip()
-
+            # rejoin list of strings into one
             item['body']=''.join(stripped)
 
-        #commentElement = self.driver.find_element_by_xpath('//*[contains(@class, "comment")]')
-
-        #print "commentElement.text: " + commentElement.text
-        #element = re.sub('Comments', '', str(commentElement.text), 1).strip()
-        #item['commentNum'] = str(commentElement.text)
         self.articleCount += 1
         print str(item)
 
         return item
-
-    def testInt(self,value):
-        try:
-            val = int(value)
-            return True
-        except:
-            return False
