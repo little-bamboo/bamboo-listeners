@@ -8,12 +8,19 @@ import json
 from urlparse import urlparse
 import re
 
+from dateutil.parser import parse
+from datetime import datetime
+
 from seattletimes.items import SeattletimesItem
 
 class SeattleTimesSpider(Spider):
 
+    # TODO: dynamically set filename using datetime?
     name='seattletimes-auth'
-    searchTerm='trump'
+    searchTerm='clinton'
+    dateFilter = "2008-01-01"
+    datetimeFilter=datetime.strptime(dateFilter, '%Y-%m-%d')
+
     articleCount=0
     filename = name + '_' + searchTerm
     dataPath = "../../../../data/election2016/"
@@ -58,7 +65,7 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=1000'
+            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=15000'
             yield scrapy.Request(
                     url=startURL,
                     callback=self.obtainURLs)
@@ -70,13 +77,16 @@ class SeattleTimesSpider(Spider):
         urls = []
         jsonresponse = json.loads(response.body_as_unicode())
 
-        # For larger data sets we will need to use callback functions for jsonresponse and links
-
-
-        #TODO Only include URLs that pass the date test
+        # Check if there are any hits and assign them to the articles array
         if jsonresponse["hits"]["hits"]:
                 for article in jsonresponse["hits"]["hits"]:
-                    if str(article["fields"]["url"]) > 0:
+
+                    articleDate = str(article["fields"]["publish_date"]).split("T")
+                    #articleDate = articleDate.split("T")
+                    articleDate = str(articleDate[0])
+                    articleDate = datetime.strptime(articleDate, '%Y-%m-%d')
+
+                    if str(article["fields"]["url"]) and (articleDate > self.datetimeFilter):
                         urls.append(str(article["fields"]["url"]))
 
         for u in urls:
@@ -84,22 +94,22 @@ class SeattleTimesSpider(Spider):
             if (u):
                 yield SplashRequest(u, self.process_request,
                                     endpoint='render.html',
-                                    args={'wait': 1.0},
+                                    args={'wait': 5.0},
                                     )
-                #yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
             else:
                 print "empty url, moving on..."
 
     def process_request(self, response):
         url = str(response.url)
 
-        #TODO: xhr request mining logging extraction
-
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
-        articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0].encode('utf-8').strip()
-        item['articleID']=articleID
+
+        articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0]
+        if articleID:
+            articleID.encode('utf-8').strip()
+            item['articleID']=articleID
 
         articleHeader = response.xpath('//*[contains(@class, "article-header")]')
         item['title']=articleHeader.xpath('h1/text()').extract()[0].encode('utf-8').strip()
@@ -130,11 +140,13 @@ class SeattleTimesSpider(Spider):
             item['body']=''.join(stripped)
 
         # TODO Handle errors when no comment can be found (try/except)
+
         commentElement = response.xpath('//*[@id="showcomments"]/span[1]/text()')
-        commentNum = commentElement.extract()[0].encode('utf-8').strip()
-        cut = " Comments"
-        commentNum = re.sub(' Comments', '', commentNum)
-        item['commentNum'] = commentNum
+        if commentElement and (str(commentElement) != 'Comments'):
+            commentNum = commentElement.extract()[0].encode('utf-8').strip().split('Comments')[0]
+            commentNum = re.sub('Comments', '', commentNum)
+            item['commentNum'] = commentNum.strip()
+            print "Comment count: " + item['commentNum']
 
         self.articleCount += 1
 
