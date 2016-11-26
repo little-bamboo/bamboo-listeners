@@ -1,11 +1,12 @@
 from scrapy.spiders import Spider
 import scrapy
-
+from scrapy_splash import SplashRequest
 from scrapy.conf import settings
 from scrapy.utils.markup import remove_tags
 
 import json
 from urlparse import urlparse
+import re
 
 from seattletimes.items import SeattletimesItem
 
@@ -57,7 +58,7 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=15000'
+            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=1000'
             yield scrapy.Request(
                     url=startURL,
                     callback=self.obtainURLs)
@@ -70,19 +71,24 @@ class SeattleTimesSpider(Spider):
         jsonresponse = json.loads(response.body_as_unicode())
 
         # For larger data sets we will need to use callback functions for jsonresponse and links
+
+
+        #TODO Only include URLs that pass the date test
         if jsonresponse["hits"]["hits"]:
                 for article in jsonresponse["hits"]["hits"]:
                     if str(article["fields"]["url"]) > 0:
                         urls.append(str(article["fields"]["url"]))
 
-        # Refactor for loop to include index count.
-        # If at the end of the index, set flag to close driver self.driver.close()
         for u in urls:
-                #print "Processing url: " + u
-                if (u):
-                        yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
-                else:
-                        print "empty url, moving on..."
+            #print "Processing url: " + u
+            if (u):
+                yield SplashRequest(u, self.process_request,
+                                    endpoint='render.html',
+                                    args={'wait': 1.0},
+                                    )
+                #yield scrapy.Request(url=u, headers=self.headers, callback=self.process_request)
+            else:
+                print "empty url, moving on..."
 
     def process_request(self, response):
         url = str(response.url)
@@ -123,7 +129,13 @@ class SeattleTimesSpider(Spider):
             # rejoin list of strings into one
             item['body']=''.join(stripped)
 
+        # TODO Handle errors when no comment can be found (try/except)
+        commentElement = response.xpath('//*[@id="showcomments"]/span[1]/text()')
+        commentNum = commentElement.extract()[0].encode('utf-8').strip()
+        cut = " Comments"
+        commentNum = re.sub(' Comments', '', commentNum)
+        item['commentNum'] = commentNum
+
         self.articleCount += 1
-        print str(item)
 
         return item
