@@ -1,44 +1,80 @@
 from scrapy.spiders import Spider
 import scrapy
 from scrapy_splash import SplashRequest
-from scrapy.conf import settings
 from scrapy.utils.markup import remove_tags
 
 import json
 from urlparse import urlparse
 import re
 
-from dateutil.parser import parse
+import time
 from datetime import datetime
 
 from seattletimes.items import SeattletimesItem
 
 class SeattleTimesSpider(Spider):
 
-    # TODO: dynamically set filename using datetime?
-    name='seattletimes-auth'
-    searchTerm='clinton'
-    dateFilter = "2008-01-01"
-    datetimeFilter=datetime.strptime(dateFilter, '%Y-%m-%d')
-
-    articleCount=0
-    filename = name + '_' + searchTerm
-    dataPath = "../../../../data/election2016/"
-    settings.overrides['FEED_URI'] = dataPath + filename + "-articles" + ".json"
-
+    name = 'seattletimes-auth'
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
     headers = {
-        'Accept':'*/*',
-        'Accept-Encoding':'gzip, deflate, sdch',
-        'Accept-Language':'en-US,en;q=0.8',
-        'Cache-Control':'max-age=0',
-        'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate, sdch',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'Cache-Control': 'max-age=0',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
     }
+
+    luascript = """
+            function main(splash)
+                assert(splash:go(splash.args.url))
+                assert(splash:wait(1))
+
+                assert(splash:evaljs("document.getElementById('showcomments').click();"))
+                assert(splash:wait(1))
+
+                -- return result as a JSON object
+                return {
+                    html = splash:html()
+                }
+            end
+            """
+    full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
+
+    def __init__(self,date='',search='',datapath='', *args, **kwargs):
+        super(Spider, self).__init__(*args,**kwargs)
+        self.date = date
+        self.searchterm = search
+        print self.date
+        print self.searchterm
+
+        # Check argument count to validate total number of required fields have been received
+        # Verify all keys in argument list are the same as what will be implemented
+        # Keys should include: 'name', 'date', 'datapath', 'filename'
+        # Compare articleid value with lookup of already scraped
+        #   Need an api that will pull in data from a table of already scraped articles
+        #       Use Hive table api as reference
+        #           Hive table will need to lookup by articleid and return a bool
+        #   Include a check to see if there has been an update (locate an indicator for when a page is updated
+        #   If articleid is not present in the lookup table, scrape it and store it.
+
+        # TODO: dynamically set filename using datetime?
+        # TODO: Import logging and setup logging for each step in process
+        # TODO: Log information statement in one line (summarized)
+
+        dateFilter = self.date
+        self.datetimeFilter=datetime.strptime(dateFilter, '%Y-%m-%d')
+
+        self.articleCount=0
+        self.filename = "seattletimes" + '_' + self.searchterm
+
+    def stringReplace(self, string):
+        return re.sub(self.full_pattern, '', string)
 
     # Entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
+
         print "beginning parse"
 
         # Push authentication
@@ -65,10 +101,15 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            startURL = 'http://www.seattletimes.com/search-api?query='+self.searchTerm+'&page=1&perpage=15000'
-            yield scrapy.Request(
-                    url=startURL,
-                    callback=self.obtainURLs)
+            pageNum=1
+            while pageNum <= 2:
+                time.sleep(.1)
+                startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=2'
+                print "Loading URL: " + startURL
+                pageNum += 1
+                yield scrapy.Request(
+                        url=startURL,
+                        callback=self.obtainURLs)
 
     def obtainURLs(self, response): 
         print "obtainURLs response: "
@@ -80,36 +121,37 @@ class SeattleTimesSpider(Spider):
         # Check if there are any hits and assign them to the articles array
         if jsonresponse["hits"]["hits"]:
                 for article in jsonresponse["hits"]["hits"]:
-
-                    articleDate = str(article["fields"]["publish_date"]).split("T")
-                    #articleDate = articleDate.split("T")
-                    articleDate = str(articleDate[0])
+                    articleDate = str(article["fields"]["publish_date"]).split("T")[0]
                     articleDate = datetime.strptime(articleDate, '%Y-%m-%d')
 
                     if str(article["fields"]["url"]) and (articleDate > self.datetimeFilter):
                         urls.append(str(article["fields"]["url"]))
 
         for u in urls:
-            #print "Processing url: " + u
+            print "Processing URL: " + u
             if (u):
+                time.sleep(0.1)
                 yield SplashRequest(u, self.process_request,
                                     endpoint='render.html',
-                                    args={'wait': 5.0},
+                                    args={'wait': 5.0, 'lua_source': self.luascript},
                                     )
             else:
                 print "empty url, moving on..."
 
     def process_request(self, response):
+        # TODO: Add support for actions - Click comment bar
+
         url = str(response.url)
 
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
+        self.call_comments(response)
 
-        articleID = response.xpath('//*[contains(@id, "post-")]/@id').extract()[0]
-        if articleID:
-            articleID.encode('utf-8').strip()
-            item['articleID']=articleID
+        articleid = response.xpath('//*[contains(@id, "post-")]/@id').extract()
+        if articleid:
+            articleid[0].encode('utf-8').strip()
+            item['articleID']=articleid
 
         articleHeader = response.xpath('//*[contains(@class, "article-header")]')
         item['title']=articleHeader.xpath('h1/text()').extract()[0].encode('utf-8').strip()
@@ -144,10 +186,42 @@ class SeattleTimesSpider(Spider):
         commentElement = response.xpath('//*[@id="showcomments"]/span[1]/text()')
         if commentElement and (str(commentElement) != 'Comments'):
             commentNum = commentElement.extract()[0].encode('utf-8').strip().split('Comments')[0]
+            if commentNum in "1 Comment":
+                commentNum = "1"
             commentNum = re.sub('Comments', '', commentNum)
             item['commentNum'] = commentNum.strip()
             print "Comment count: " + item['commentNum']
 
+        #for sel in response.xpath('//*[contains(@class, "fyre")]'):
+        #    print sel
+
         self.articleCount += 1
 
         return item
+
+    def call_comments(self, response):
+        # Determine re pattern for matching against the specific keys:
+        #   postIDBase64=window.SEATIMESCO.comments.info.postIDBase64
+        #   window.SEATIMESCO.comments.info.postID
+        #   window.SEATIMESCO.comments.info.postIDBase64
+        # JavaScript link will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/MTAyMTk4MDM=/init
+        # template will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/'+self.siteID+'/'+self.postIDBase64+'=/init'
+        siteID = "window.SEATIMESCO.comments.info.siteID"
+        postIDBase64 = "window.SEATIMESCO.comments.info.postIDBase64"
+        scriptheaderdata = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]') \
+            .extract()[0].encode('utf-8').strip()
+        commentSettings = []
+        for line in scriptheaderdata.split("\n"):
+            line = re.sub(r"\s+", "", line, flags=re.UNICODE)
+            if (siteID in line) or (postIDBase64 in line):
+                commentSettings += [line]
+        settingsDict = dict(line.split("=", 1) for line in commentSettings)
+        for key, value in settingsDict.iteritems():
+            value = re.sub(self.full_pattern, '', value)
+            settingsDict[key] = value
+
+        commentjsURL = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/'+ \
+                       settingsDict[siteID]+'/'+settingsDict[postIDBase64]+'=/init'
+
+        print commentjsURL
+
