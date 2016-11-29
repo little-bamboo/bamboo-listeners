@@ -10,7 +10,10 @@ import re
 import time
 from datetime import datetime
 
+import urllib2
+
 from seattletimes.items import SeattletimesItem
+
 
 class SeattleTimesSpider(Spider):
 
@@ -23,7 +26,8 @@ class SeattleTimesSpider(Spider):
         'Accept-Encoding': 'gzip, deflate, sdch',
         'Accept-Language': 'en-US,en;q=0.8',
         'Cache-Control': 'max-age=0',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) \
+         Chrome/48.0.2564.116 Safari/537.36'
     }
 
     luascript = """
@@ -40,24 +44,16 @@ class SeattleTimesSpider(Spider):
                 }
             end
             """
+
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
-    def __init__(self,date='',search='',datapath='', *args, **kwargs):
+    def __init__(self,date='',search='', datapath='', *args, **kwargs):
         super(Spider, self).__init__(*args,**kwargs)
         self.date = date
         self.searchterm = search
         print self.date
         print self.searchterm
-
-        # Check argument count to validate total number of required fields have been received
-        # Verify all keys in argument list are the same as what will be implemented
-        # Keys should include: 'name', 'date', 'datapath', 'filename'
-        # Compare articleid value with lookup of already scraped
-        #   Need an api that will pull in data from a table of already scraped articles
-        #       Use Hive table api as reference
-        #           Hive table will need to lookup by articleid and return a bool
-        #   Include a check to see if there has been an update (locate an indicator for when a page is updated
-        #   If articleid is not present in the lookup table, scrape it and store it.
+        print datapath
 
         # TODO: dynamically set filename using datetime?
         # TODO: Import logging and setup logging for each step in process
@@ -66,7 +62,7 @@ class SeattleTimesSpider(Spider):
         dateFilter = self.date
         self.datetimeFilter=datetime.strptime(dateFilter, '%Y-%m-%d')
 
-        self.articleCount=0
+        self.articleCount = 0
         self.filename = "seattletimes" + '_' + self.searchterm
 
     def stringReplace(self, string):
@@ -101,15 +97,15 @@ class SeattleTimesSpider(Spider):
             # for link in links:
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
-            pageNum=1
+            pageNum = 1
             while pageNum <= 2:
                 time.sleep(.1)
-                startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=2'
-                print "Loading URL: " + startURL
+                startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=100'
                 pageNum += 1
+
                 yield scrapy.Request(
-                        url=startURL,
-                        callback=self.obtainURLs)
+                    url=startURL,
+                    callback=self.obtainURLs)
 
     def obtainURLs(self, response): 
         print "obtainURLs response: "
@@ -128,7 +124,7 @@ class SeattleTimesSpider(Spider):
                         urls.append(str(article["fields"]["url"]))
 
         for u in urls:
-            print "Processing URL: " + u
+            #print "Processing URL: " + u
             if (u):
                 time.sleep(0.1)
                 yield SplashRequest(u, self.process_request,
@@ -146,11 +142,47 @@ class SeattleTimesSpider(Spider):
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
 
-        self.call_comments(response)
 
-        articleid = response.xpath('//*[contains(@id, "post-")]/@id').extract()
+        # Determine re pattern for matching against the specific keys:
+        #   postIDBase64=window.SEATIMESCO.comments.info.postIDBase64
+        #   window.SEATIMESCO.comments.info.postID
+        #   window.SEATIMESCO.comments.info.postIDBase64
+        # JavaScript link will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/MTAyMTk4MDM=/init
+        # template will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/'+self.siteID+'/'+self.postIDBase64+'=/init'
+        siteID = "window.SEATIMESCO.comments.info.siteID"
+        postIDBase64 = "window.SEATIMESCO.comments.info.postIDBase64"
+        scriptheaderdata = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]') \
+            .extract()[0].encode('utf-8').strip()
+
+        commentSettings = []
+        for line in scriptheaderdata.split("\n"):
+            line = re.sub(r"\s+", "", line, flags=re.UNICODE)
+            if (siteID in line) or (postIDBase64 in line):
+                commentSettings += [line]
+        settingsDict = dict(line.split("=", 1) for line in commentSettings)
+
+        commentjsURL = ""
+        for key, value in settingsDict.iteritems():
+            value = re.sub(self.full_pattern, '', value)
+            settingsDict[key] = value
+            commentjsURL = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + \
+                           settingsDict[siteID] + '/' + settingsDict[postIDBase64] + '=/1.json'
+
+        if commentjsURL:
+            try:
+                commentResponse = urllib2.urlopen(commentjsURL)
+                commentJSON = json.load(commentResponse)
+                print commentJSON
+            except urllib2.HTTPError, e:
+                print e.code
+                print e.msg
+                return
+
+        articleid = response.xpath('//*[contains(@id, "post-")]/@id')
+
         if articleid:
-            articleid[0].encode('utf-8').strip()
+            articleid = articleid.extract()
+            articleid = articleid[0].encode('utf-8').strip()
             item['articleID']=articleid
 
         articleHeader = response.xpath('//*[contains(@class, "article-header")]')
@@ -192,36 +224,7 @@ class SeattleTimesSpider(Spider):
             item['commentNum'] = commentNum.strip()
             print "Comment count: " + item['commentNum']
 
-        #for sel in response.xpath('//*[contains(@class, "fyre")]'):
-        #    print sel
-
         self.articleCount += 1
 
         return item
-
-    def call_comments(self, response):
-        # Determine re pattern for matching against the specific keys:
-        #   postIDBase64=window.SEATIMESCO.comments.info.postIDBase64
-        #   window.SEATIMESCO.comments.info.postID
-        #   window.SEATIMESCO.comments.info.postIDBase64
-        # JavaScript link will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/MTAyMTk4MDM=/init
-        # template will be http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/'+self.siteID+'/'+self.postIDBase64+'=/init'
-        siteID = "window.SEATIMESCO.comments.info.siteID"
-        postIDBase64 = "window.SEATIMESCO.comments.info.postIDBase64"
-        scriptheaderdata = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]') \
-            .extract()[0].encode('utf-8').strip()
-        commentSettings = []
-        for line in scriptheaderdata.split("\n"):
-            line = re.sub(r"\s+", "", line, flags=re.UNICODE)
-            if (siteID in line) or (postIDBase64 in line):
-                commentSettings += [line]
-        settingsDict = dict(line.split("=", 1) for line in commentSettings)
-        for key, value in settingsDict.iteritems():
-            value = re.sub(self.full_pattern, '', value)
-            settingsDict[key] = value
-
-        commentjsURL = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/'+ \
-                       settingsDict[siteID]+'/'+settingsDict[postIDBase64]+'=/init'
-
-        print commentjsURL
 
