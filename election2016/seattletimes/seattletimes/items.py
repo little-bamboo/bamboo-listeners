@@ -21,12 +21,5 @@ class SeattletimesItem(scrapy.Item):
     author = scrapy.Field()
     commentNum = scrapy.Field()
     commentjsURL = scrapy.Field()
+    comData = scrapy.Field()
     pass
-
-class CommentsItem(scrapy.Item):
-	# define the fields for your item here that will hold:
-	#	comment name, body, text, relationships, number of comments,etc.
-	comName = scrapy.Field()
-	comTitle = scrapy.Field()
-	comAuthor = scrapy.Field()
-	comDate = scrapy.Field()

@@ -1,6 +1,5 @@
 from scrapy.spiders import Spider
 import scrapy
-from scrapy_splash import SplashRequest
 from scrapy.utils.markup import remove_tags
 
 import json
@@ -45,6 +44,7 @@ class SeattleTimesSpider(Spider):
             end
             """
 
+    # Useful for stripping unicode and unnecessary characters
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
     def __init__(self,date='',search='', datapath='', *args, **kwargs):
@@ -55,7 +55,6 @@ class SeattleTimesSpider(Spider):
         print self.searchterm
         print datapath
 
-        # TODO: dynamically set filename using datetime?
         # TODO: Import logging and setup logging for each step in process
         # TODO: Log information statement in one line (summarized)
 
@@ -98,9 +97,9 @@ class SeattleTimesSpider(Spider):
             #       yield Request(url=link, callback=self.begin_scrapy)
             # print("Existing settings: %s" % self.settings.attributes.values())
             pageNum = 1
-            while pageNum <= 2:
+            while pageNum <= 10:
                 time.sleep(.1)
-                startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=100'
+                startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=1000'
                 pageNum += 1
 
                 yield scrapy.Request(
@@ -127,21 +126,16 @@ class SeattleTimesSpider(Spider):
             #print "Processing URL: " + u
             if (u):
                 time.sleep(0.1)
-                yield SplashRequest(u, self.process_request,
-                                    endpoint='render.html',
-                                    args={'wait': 5.0, 'lua_source': self.luascript},
-                                    )
+                yield scrapy.Request(u, callback=self.process_request)
             else:
                 print "empty url, moving on..."
 
     def process_request(self, response):
-        # TODO: Add support for actions - Click comment bar
 
         url = str(response.url)
 
         item=SeattletimesItem()
         item['searchIndex']=str(self.filename)+"_"+str(self.articleCount)
-
 
         # Determine re pattern for matching against the specific keys:
         #   postIDBase64=window.SEATIMESCO.comments.info.postIDBase64
@@ -154,6 +148,7 @@ class SeattleTimesSpider(Spider):
         scriptheaderdata = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]') \
             .extract()[0].encode('utf-8').strip()
 
+        # Collect the necessary settings to build the xhr response for the comments
         commentSettings = []
         for line in scriptheaderdata.split("\n"):
             line = re.sub(r"\s+", "", line, flags=re.UNICODE)
@@ -161,22 +156,26 @@ class SeattleTimesSpider(Spider):
                 commentSettings += [line]
         settingsDict = dict(line.split("=", 1) for line in commentSettings)
 
+        # Construct the url used to retrieve the comment data
         commentjsURL = ""
         for key, value in settingsDict.iteritems():
             value = re.sub(self.full_pattern, '', value)
             settingsDict[key] = value
             commentjsURL = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + \
-                           settingsDict[siteID] + '/' + settingsDict[postIDBase64] + '=/1.json'
-
+                           settingsDict[siteID] + '/' + settingsDict[postIDBase64] + '=/init'
+        # Trigger the comment response using urllib2
         if commentjsURL:
             try:
                 commentResponse = urllib2.urlopen(commentjsURL)
+                time.sleep(0.1)
                 commentJSON = json.load(commentResponse)
-                print commentJSON
+                # print commentJSON["headDocument"]["content"]
+                print "Storing Comment"
+                # Store the json comment blob for export as child within each story
+                item['comData']=commentJSON["headDocument"]["content"]
+
             except urllib2.HTTPError, e:
-                print e.code
-                print e.msg
-                return
+                print "No response: " + e.code + e.msg
 
         articleid = response.xpath('//*[contains(@id, "post-")]/@id')
 
@@ -212,17 +211,6 @@ class SeattleTimesSpider(Spider):
                     stripped += str(remove_tags(para).encode('utf-8')).strip()
             # rejoin list of strings into one
             item['body']=''.join(stripped)
-
-        # TODO Handle errors when no comment can be found (try/except)
-
-        commentElement = response.xpath('//*[@id="showcomments"]/span[1]/text()')
-        if commentElement and (str(commentElement) != 'Comments'):
-            commentNum = commentElement.extract()[0].encode('utf-8').strip().split('Comments')[0]
-            if commentNum in "1 Comment":
-                commentNum = "1"
-            commentNum = re.sub('Comments', '', commentNum)
-            item['commentNum'] = commentNum.strip()
-            print "Comment count: " + item['commentNum']
 
         self.articleCount += 1
 
