@@ -29,21 +29,6 @@ class SeattleTimesSpider(Spider):
          Chrome/48.0.2564.116 Safari/537.36'
     }
 
-    luascript = """
-            function main(splash)
-                assert(splash:go(splash.args.url))
-                assert(splash:wait(1))
-
-                assert(splash:evaljs("document.getElementById('showcomments').click();"))
-                assert(splash:wait(1))
-
-                -- return result as a JSON object
-                return {
-                    html = splash:html()
-                }
-            end
-            """
-
     # Useful for stripping unicode and unnecessary characters
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
@@ -98,7 +83,7 @@ class SeattleTimesSpider(Spider):
             # print("Existing settings: %s" % self.settings.attributes.values())
             pageNum = 1
             while pageNum <= 10:
-                time.sleep(.1)
+                time.sleep(3)
                 startURL='http://www.seattletimes.com/search-api?query='+self.searchterm+'&page='+str(pageNum)+'&perpage=1000'
                 pageNum += 1
 
@@ -125,7 +110,6 @@ class SeattleTimesSpider(Spider):
         for u in urls:
             #print "Processing URL: " + u
             if (u):
-                time.sleep(0.1)
                 yield scrapy.Request(u, callback=self.process_request)
             else:
                 print "empty url, moving on..."
@@ -167,15 +151,14 @@ class SeattleTimesSpider(Spider):
         if commentjsURL:
             try:
                 commentResponse = urllib2.urlopen(commentjsURL)
-                time.sleep(0.1)
                 commentJSON = json.load(commentResponse)
                 # print commentJSON["headDocument"]["content"]
-                print "Storing Comment"
+                print "Storing Comments Data"
                 # Store the json comment blob for export as child within each story
                 item['comData']=commentJSON["headDocument"]["content"]
 
             except urllib2.HTTPError, e:
-                print "No response: " + e.code + e.msg
+                print "No response: " + str(e.code) + " " + str(e.msg)
 
         articleid = response.xpath('//*[contains(@id, "post-")]/@id')
 
