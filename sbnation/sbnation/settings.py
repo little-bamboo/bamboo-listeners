@@ -14,6 +14,14 @@ BOT_NAME = 'sbnation'
 SPIDER_MODULES = ['sbnation.spiders']
 NEWSPIDER_MODULE = 'sbnation.spiders'
 
+# User Defined:
+LOG_LEVEL = 'INFO'
+FEED_EXPORTERS = {
+ 'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
+}
+FEED_FORMAT = 'jsonlines'
+FEED_URI = "levesque.json"
+
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'sbnation (+http://www.yourdomain.com)'

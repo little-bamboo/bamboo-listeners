@@ -147,6 +147,7 @@ class SeattleTimesSpider(Spider):
             settingsDict[key] = value
             commentjsURL = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + \
                            settingsDict[siteID] + '/' + settingsDict[postIDBase64] + '=/init'
+
         # Trigger the comment response using urllib2
         if commentjsURL:
             try:
