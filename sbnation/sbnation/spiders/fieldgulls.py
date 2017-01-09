@@ -1,15 +1,11 @@
 import scrapy
-import time
 from scrapy.utils.markup import remove_tags
 import json
 import re
 
-import time
-from datetime import datetime
-
 import urllib2
 
-from sbnation.items import FieldGullsItem
+from sbnation.items import SBNationItem
 
 class FieldGullsSpider(scrapy.Spider):
     name = "fieldgulls"
@@ -32,8 +28,8 @@ class FieldGullsSpider(scrapy.Spider):
     def start_requests(self):
 
         # Build a list of URLs using the search URL and paginating through results
-
-        url = 'http://www.sounderatheart.com/search?q=levesque'
+        search_term = 'sounders'
+        url = 'http://www.fieldgulls.com/search?q=' + search_term
         yield scrapy.Request(url=url,headers=self.headers, callback=self.parse_search)
 
     def parse_search(self, response):
@@ -43,17 +39,17 @@ class FieldGullsSpider(scrapy.Spider):
         for article in articleLinks:
             yield scrapy.Request(url=article,headers=self.headers, callback=self.parse_article)
 
-        nextPage =  response.css('span.m-pagination__next a::attr(href)').extract()
+        nextPage = response.css('span.m-pagination__next a::attr(href)').extract()
 
         if nextPage is not None:
             for nextUrl in nextPage:
-                nextLink = 'http://www.sounderatheart.com/' + str(nextUrl)
+                nextLink = 'http://www.fieldgulls.com/' + str(nextUrl)
                 print "nextLink: " + nextLink
                 yield scrapy.Request(url=nextLink,headers=self.headers, callback=self.parse_search)
 
 
     def parse_article(self, response):
-        item = FieldGullsItem()
+        item = SBNationItem()
 
         title = response.css('h1.c-page-title').extract()
         if len(title) > 0:

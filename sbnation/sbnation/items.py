@@ -8,7 +8,7 @@
 import scrapy
 
 
-class FieldGullsItem(scrapy.Item):
+class SBNationItem(scrapy.Item):
     # define the fields for your item here like:
     aTitle = scrapy.Field()
     aLink = scrapy.Field()
