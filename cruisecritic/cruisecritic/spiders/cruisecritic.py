@@ -5,25 +5,24 @@ from scrapy.utils.markup import remove_tags
 import json
 from urlparse import urlparse
 import urllib2
-from scrapy_splash import SplashRequest
 
 import re
 
 import time
 from datetime import datetime
 
-from seattletimes.items import SeattletimesItem
+from cruisecritic.items import CruisecriticItem
 
 # TODO: Import logging and setup logging for each step in process
 # TODO: Log information statement in one line (summarized)
 # TODO: Modify FEEDURI global property to include the search term and date parameters used for the crawl request
 
 
-class SeattleTimesSpider(Spider):
+class CruisecriticSpider(Spider):
 
-    name = 'seattletimes-auth'
-    allowed_domains = ['seattletimes.com']
-    start_urls = ['https://secure.seattletimes.com/accountcenter/login']
+    name = 'cruisecritic'
+    allowed_domains = ['cruisecritic.com']
+    start_urls = ['http://boards.cruisecritic.com/index.php']
 
     headers = {
         'Accept': '*/*',
@@ -39,22 +38,11 @@ class SeattleTimesSpider(Spider):
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
     def __init__(self, date='', search='', datapath=''):
-        # Call super to initialize the instance
+        # Call super to initialize the
         super(Spider, self).__init__()
-        self.startdate = date
-        self.enddate = (str(datetime.now()).split(" ")[0])
-        self.searchterm = search
+        self.now_date = (str(datetime.now()).split(" ")[0])
+        print(self.now_date)
 
-        # Print arguments to console for validation
-        print self.startdate
-        print self.enddate
-        print self.searchterm
-        print datapath
-
-        self.articleCount = 0
-        self.filename = "seattletimes" + '_' + self.searchterm + '_' + self.startdate
-
-        print('filename=' + self.filename)
 
     # Endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
@@ -64,7 +52,7 @@ class SeattleTimesSpider(Spider):
         # Push authentication
         return scrapy.FormRequest.from_response(
                 response,
-                formdata={'username': 'briansc@gmail.com', 'password': 'thomas7'},
+                formdata={'username': 'bludeeyank', 'password': 'thomas7'},
                 callback=self.auth_login
                 )
 
@@ -89,10 +77,16 @@ class SeattleTimesSpider(Spider):
             #           ?query='+self.searchterm+'&page='+str(page_num)+'&perpage=1000'
 
             page_num = 1
-            # TODO: Add flag that turns off while loop when there are no more articles (try/while)
+            # TODO: Add flag that turns off while loop when there are no more articles (try/while?)
             while page_num <= 600:
                 print('page_num: ' + str(page_num))
                 time.sleep(1)
+                # startURL='http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
+                #         'query='+self.searchterm+'' \
+                #         '&startdate='+self.startdate+'' \
+                #         '&enddate='+self.enddate+'' \
+                #         '&sortby=mostrecent&page='+str(page_num)+'' \
+                #         '&perpage=100'
 
                 new_url = 'http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
                           'query=' + self.searchterm + \
@@ -138,7 +132,7 @@ class SeattleTimesSpider(Spider):
         print('process response request')
         url = str(response.url)
 
-        item = SeattletimesItem()
+        item = CruisecriticItem()
         item['searchIndex'] = str(self.filename) + "_" + str(self.articleCount)
 
         # Determine re pattern for matching against the specific keys:

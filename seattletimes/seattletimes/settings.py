@@ -10,7 +10,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
 # Splash
-SPLASH_URL = 'http://10.0.1.10:8050/'
+SPLASH_URL = 'http://bamboo-dev.local:8050/'
 DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
 HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
 

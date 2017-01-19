@@ -1,7 +1,10 @@
+from scrapy.spiders import Spider
 import scrapy
 from scrapy.utils.markup import remove_tags
+
 import json
 import re
+import datetime
 
 import urllib2
 
@@ -21,6 +24,25 @@ class SounderAtHeartSpider(scrapy.Spider):
 
     # Useful for stripping unicode and unnecessary characters
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
+
+    def __init__(self,date='',search='', datapath='', *args, **kwargs):
+        super(Spider, self).__init__(*args,**kwargs)
+
+        self.date = date
+        self.currentDate = datetime.datetime.now()
+        self.search_term = search
+        print self.date
+        print self.search_term
+        print datapath
+
+        # TODO: Import logging and setup logging for each step in process
+        # TODO: Log information statement in one line (summarized)
+
+        dateFilter = self.date
+        self.datetimeFilter=datetime.strptime(dateFilter, '%Y-%m-%d')
+
+        self.articleCount = 0
+        self.filename = "sounderatheart" + '_' + self.search_term
 
     def stringReplace(self, string):
         return re.sub(self.full_pattern, '', string)
@@ -55,7 +77,7 @@ class SounderAtHeartSpider(scrapy.Spider):
         if len(title) > 0:
             item['aTitle']=remove_tags(title[0].strip())
         else:
-
+            pass
 
         body = response.xpath('/html/body/section/section/div[2]/div[1]/div[1]').extract()
         if len(body) > 0:

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Scrapy settings for nfldata project
+# Scrapy settings for seattletimes project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -9,17 +9,30 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'nfldata'
+# Splash
+SPLASH_URL = 'http://bamboo-dev.local:8050/'
+DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
+HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
 
-SPIDER_MODULES = ['nfldata.spiders']
-NEWSPIDER_MODULE = 'nfldata.spiders'
+# User Defined:
+LOG_LEVEL = 'INFO'
+FEED_EXPORTERS = {
+ 'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
+}
+FEED_FORMAT = 'jsonlines'
+FEED_URI = "file.json"
+SEARCH_TERMS = ["clinton", "trump"]
 
+BOT_NAME = 'seattletimes'
+
+SPIDER_MODULES = ['seattletimes.spiders']
+NEWSPIDER_MODULE = 'seattletimes.spiders'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'nfldata (+http://www.yourdomain.com)'
+#USER_AGENT = 'seattletimes (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
@@ -47,14 +60,28 @@ ROBOTSTXT_OBEY = True
 # Enable or disable spider middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    'nfldata.middlewares.MyCustomSpiderMiddleware': 543,
+#    'seattletimes.middlewares.MyCustomSpiderMiddleware': 543,
 #}
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    'nfldata.middlewares.MyCustomDownloaderMiddleware': 543,
+#    'seattletimes.middlewares.MyCustomDownloaderMiddleware': 543,
 #}
+
+#DOWNLOADER_MIDDLEWARES = {
+#    'seattletimes.middlewares.selenium.SeleniumMiddleware': 200
+#}
+
+DOWNLOADER_MIDDLEWARES = {
+    'scrapy_splash.SplashCookiesMiddleware': 723,
+    'scrapy_splash.SplashMiddleware': 725,
+    'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
+}
+
+SPIDER_MIDDLEWARES = {
+    'scrapy_splash.SplashDeduplicateArgsMiddleware': 100,
+}
 
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
@@ -64,9 +91,9 @@ ROBOTSTXT_OBEY = True
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'nfldata.pipelines.SomePipeline': 300,
-#}
+#  ITEM_PIPELINES = {
+#      'seattletimes.pipelines.SeattletimesPipeline': 100,
+#  }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
