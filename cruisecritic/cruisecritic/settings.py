@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Scrapy settings for seattletimes project
+# Scrapy settings for cruisecritic project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -9,27 +9,14 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-# Splash
-SPLASH_URL = 'http://bamboo-dev.local:8050/'
-DUPEFILTER_CLASS = 'scrapy_splash.SplashAwareDupeFilter'
-HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
+BOT_NAME = 'cruisecritic'
 
-# User Defined:
-LOG_LEVEL = 'INFO'
-FEED_EXPORTERS = {
- 'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
-}
-FEED_FORMAT = 'jsonlines'
-FEED_URI = "file.json"
-SEARCH_TERMS = ["clinton", "trump"]
+SPIDER_MODULES = ['cruisecritic.spiders']
+NEWSPIDER_MODULE = 'cruisecritic.spiders'
 
-BOT_NAME = 'seattletimes'
-
-SPIDER_MODULES = ['seattletimes.spiders']
-NEWSPIDER_MODULE = 'seattletimes.spiders'
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = 'seattletimes (+http://www.yourdomain.com)'
+#USER_AGENT = 'cruisecritic (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
@@ -60,28 +47,14 @@ ROBOTSTXT_OBEY = False
 # Enable or disable spider middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    'seattletimes.middlewares.MyCustomSpiderMiddleware': 543,
+#    'cruisecritic.middlewares.CruisecriticSpiderMiddleware': 543,
 #}
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    'seattletimes.middlewares.MyCustomDownloaderMiddleware': 543,
+#    'cruisecritic.middlewares.MyCustomDownloaderMiddleware': 543,
 #}
-
-#DOWNLOADER_MIDDLEWARES = {
-#    'seattletimes.middlewares.selenium.SeleniumMiddleware': 200
-#}
-
-DOWNLOADER_MIDDLEWARES = {
-    'scrapy_splash.SplashCookiesMiddleware': 723,
-    'scrapy_splash.SplashMiddleware': 725,
-    'scrapy.downloadermiddlewares.httpcompression.HttpCompressionMiddleware': 810,
-}
-
-SPIDER_MIDDLEWARES = {
-    'scrapy_splash.SplashDeduplicateArgsMiddleware': 100,
-}
 
 # Enable or disable extensions
 # See http://scrapy.readthedocs.org/en/latest/topics/extensions.html
@@ -91,9 +64,9 @@ SPIDER_MIDDLEWARES = {
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#  ITEM_PIPELINES = {
-#      'seattletimes.pipelines.SeattletimesPipeline': 100,
-#  }
+#ITEM_PIPELINES = {
+#    'cruisecritic.pipelines.SomePipeline': 300,
+#}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html

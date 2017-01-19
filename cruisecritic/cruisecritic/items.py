@@ -7,14 +7,8 @@
 
 import scrapy
 
+
 class CruisecriticItem(scrapy.Item):
     # define the fields for your item here like:
-    title = scrapy.Field()
-    link = scrapy.Field()
-    body = scrapy.Field()
-    date = scrapy.Field()
-    url = scrapy.Field()
-    user = scrapy.Field()
-    articleId = scrapy.Field()
-    commentId = scrapy.Field()
+    name = scrapy.Field()
     pass
