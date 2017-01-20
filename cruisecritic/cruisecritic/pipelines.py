@@ -11,6 +11,9 @@ import hashlib
 from scrapy.exceptions import DropItem
 from scrapy.http import Request
 
+import MySQLdb
+db=MySQLdb.connect
+
 class CruisecriticPipeline(object):
     def __init__(self):
         self.conn = MySQLdb.connect('bambooiq.ddns.net', 'dbBambooDev', 'B@mboo99', 'dbBambooDev', charset="utf8", use_unicode=True)
@@ -19,11 +22,11 @@ class CruisecriticPipeline(object):
 
     def process_item(self, item, spider):
         try:
-            self.cursor.execute("""INSERT INTO cc (name)
-                            VALUES (%s)""",
-                                (item['name'].encode('utf-8')))
+            # self.cursor.execute("""INSERT INTO dbBambooDev.cc VALUES (%s)""", (item['name']))
 
-            self.conn.commit()
+            #self.conn.commit()
+
+            pass
 
 
         except MySQLdb.Error, e:
