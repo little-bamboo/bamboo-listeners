@@ -22,4 +22,5 @@ class SeattletimesItem(scrapy.Item):
     commentNum = scrapy.Field()
     commentjsURL = scrapy.Field()
     comData = scrapy.Field()
+    commentStream = scrapy.Field()
     pass

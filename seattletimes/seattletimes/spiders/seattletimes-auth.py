@@ -8,6 +8,7 @@ import urllib2
 from scrapy_splash import SplashRequest
 
 import re
+from lxml import etree
 
 import time
 from datetime import datetime
@@ -17,7 +18,6 @@ from seattletimes.items import SeattletimesItem
 # TODO: Import logging and setup logging for each step in process
 # TODO: Log information statement in one line (summarized)
 # TODO: Modify FEEDURI global property to include the search term and date parameters used for the crawl request
-
 
 class SeattleTimesSpider(Spider):
 
@@ -34,6 +34,42 @@ class SeattleTimesSpider(Spider):
          Chrome/48.0.2564.116 Safari/537.36',
         'Accept-Charset': 'utf-8'
     }
+
+    script = """
+
+    function wait_for_element(splash, css, maxwait)
+        if maxwait == nil then
+        maxwait = 10
+    end
+
+    return splash:wait_for_resume(string.format([[
+        function main(splash) {
+          var selector = '%s';
+          var maxwait = %s;
+          var end = Date.now() + maxwait*1000;
+
+          function check() {
+            if(document.querySelector(selector)) {
+              splash.resume('Element found');
+            } else if(Date.now() >= end) {
+              var err = 'Timeout waiting for element';
+              splash.error(err + " " + selector);
+            } else {
+              setTimeout(check, 200);
+            }
+          }
+          check();
+        }]], css, maxwait))
+    end
+
+    function main(splash)
+        splash:go(splash.args.url)
+        wait_for_element(splash, "#fyre-comment-user")
+        return {html=splash:html()}
+    end
+
+
+    """
 
     # Useful for stripping unicode and unnecessary characters
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
@@ -58,8 +94,7 @@ class SeattleTimesSpider(Spider):
 
     # Endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
-
-        print "beginning parse"
+        print("beginning parse")
 
         # Push authentication
         return scrapy.FormRequest.from_response(
@@ -90,9 +125,9 @@ class SeattleTimesSpider(Spider):
 
             page_num = 1
             # TODO: Add flag that turns off while loop when there are no more articles (try/while)
-            while page_num <= 600:
+            while page_num <= 750:
                 print('page_num: ' + str(page_num))
-                time.sleep(1)
+                time.sleep(0.1)
 
                 new_url = 'http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
                           'query=' + self.searchterm + \
@@ -122,22 +157,23 @@ class SeattleTimesSpider(Spider):
                 urls.append(str(article["fields"]["url"].strip()))
 
         for u in urls:
+            u += '#comments'
             print "Processing URL: " + u
             if u:
-                yield scrapy.Request(u, callback=self.process_request)
-                # yield SplashRequest(u, self.process_request,
-                #                     endpoint='/execute',
-                #                     cache_args=['lua_source'],
-                #                     args={'lua_source': script, 'wait': 5.0},
-                #                     headers=self.headers,
-                #                     )
+                #yield scrapy.Request(u, callback=self.process_request)
+                yield SplashRequest(u, self.process_request,
+                                    endpoint='execute',
+                                    args={'lua_source': self.script}
+                                    )
             else:
                 print "empty url, moving on..."
 
     def process_request(self, response):
         print('process response request')
+        #print(response.data['html'])
+        r = response.data['html'].encode('utf-8')
+        tree = etree.HTML(r)
         url = str(response.url)
-
         item = SeattletimesItem()
         item['searchIndex'] = str(self.filename) + "_" + str(self.articleCount)
 
@@ -151,12 +187,11 @@ class SeattleTimesSpider(Spider):
 
         siteID = "window.SEATIMESCO.comments.info.siteID"
         postIDBase64 = "window.SEATIMESCO.comments.info.postIDBase64"
-        scriptheaderdata = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]') \
-            .extract()[0].encode('utf-8').strip()
+        scriptheaderdata = tree.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]')[0]
 
         # Collect the necessary settings to build the xhr response for the comments
         comment_settings = []
-        for line in scriptheaderdata.split("\n"):
+        for line in scriptheaderdata.text.split("\n"):
             line = re.sub(r"\s+", "", line, flags=re.UNICODE)
             if (siteID in line) or (postIDBase64 in line):
                 comment_settings += [line]
@@ -220,8 +255,38 @@ class SeattleTimesSpider(Spider):
             # rejoin list of strings into one
             item['body'] = ''.join(stripped)
 
+        comments = response.xpath('//*[contains(@class, "fyre-comment-article")]')
+
+        if comments is not None:
+
+            comment_list = []
+            for comment in comments:
+                comment_list.append(comment.extract().encode('utf-8'))
+            item['commentStream'] = comment_list
+        else:
+            item['commentStream'] = ''
+
         self.articleCount += 1
 
         print item
         return item
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
