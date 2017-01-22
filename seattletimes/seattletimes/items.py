@@ -21,6 +21,10 @@ class SeattletimesItem(scrapy.Item):
     author = scrapy.Field()
     commentNum = scrapy.Field()
     commentjsURL = scrapy.Field()
-    comData = scrapy.Field()
     commentStream = scrapy.Field()
+    pass
+
+class SeattletimesProfile(scrapy.Item):
+    commentAuthor = scrapy.Field()
+    commentAuthorURL = scrapy.Field()
     pass
