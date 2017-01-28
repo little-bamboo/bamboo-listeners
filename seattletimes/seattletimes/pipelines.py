@@ -7,10 +7,11 @@
 
 from seattletimes.items import SeattletimesItem
 
+
 class SeattletimesPipeline(object):
-    def process_item(self, item, spider):
-        if isinstance(item, SeattletimesItem):
-            # TODO: Add enrichment lookups here
-            # TODO: Can we add 'bot' like functionality here?
-            # TODO: What kind of reiforcement learning can we apply at this step?
-            return item
+	def process_item(self, item, spider):
+		if isinstance(item, SeattletimesItem):
+			# TODO: Add enrichment lookups here
+			# TODO: Can we add 'bot' like functionality here?
+			# TODO: What kind of reiforcement learning can we apply at this step?
+			return item
