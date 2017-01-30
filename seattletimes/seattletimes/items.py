@@ -21,6 +21,8 @@ class SeattletimesArticle(scrapy.Item):
     authorAffiliation = scrapy.Field()
     author = scrapy.Field()
     commentjsURL = scrapy.Field()
+    siteid = scrapy.Field()
+    post_id_base64 = scrapy.Field()
     pass
 
 
@@ -29,6 +31,7 @@ class SeattletimesProfile(scrapy.Item):
     datejoined = scrapy.Field()
     location = scrapy.Field()
     about = scrapy.Field()
+    articleID = scrapy.Field()
 
     pass
 
@@ -38,5 +41,5 @@ class SeattletimesComment(scrapy.Item):
     commentStream = scrapy.Field()
     commentAuthor = scrapy.Field()
     commentAuthorURL = scrapy.Field()
-
+    articleID = scrapy.Field()
     pass

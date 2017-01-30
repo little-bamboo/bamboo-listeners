@@ -59,8 +59,8 @@ class SeattleTimesSpider(Spider):
     def auth_login(self, response):
         page_num = 1
         # TODO: Add flag that turns off while loop when there are no more articles (try/while)
-        while page_num <= 400:
-            time.sleep(0.0)
+        while page_num <= 1:
+            time.sleep(1)
 
             # Example: http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search? \
             # query=the&startdate=2017-01-01&enddate=2017-10-01&sortby=mostrecent&page=1&perpage=200
@@ -89,12 +89,12 @@ class SeattleTimesSpider(Spider):
 
         for u in urls:
             if u is not None:
-                yield scrapy.Request(u, callback=self.process_url)
+                yield scrapy.Request(u, callback=self.process_article)
 
             else:
                 print "empty url, moving on..."
 
-    def process_url(self, response):
+    def process_article(self, response):
         url = str(response.url)
 
         article = SeattletimesArticle()
@@ -108,6 +108,10 @@ class SeattleTimesSpider(Spider):
 
         siteid = "window.SEATIMESCO.comments.info.siteID"
         post_id_base64 = "window.SEATIMESCO.comments.info.postIDBase64"
+
+        if siteid:
+            article["siteid"] = siteid
+            article["post_id_base64"] = post_id_base64
 
         script_header_settings = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]').extract()[0].encode('utf-8').strip()
 
@@ -188,4 +192,7 @@ class SeattleTimesSpider(Spider):
         self.articleCount += 1
 
         print(str(self.articleCount) + ' ' + article['date'] + ' ' + article['title'] + ' ' + article['articleURL'])
+
         return article
+
+
