@@ -12,16 +12,18 @@ from datetime import datetime
 
 from seattletimes.items import SeattletimesArticle
 
-
 # TODO: Import logging and setup logging for each step in process
 # TODO: Log information statement in one line (summarized)
 # TODO: Modify FEEDURI global property to include the search term and date parameters used for the crawl request
+# TODO: Add comment number extraction (splash?) - stored use for identifying
 
 
 class SeattleTimesSpider(Spider):
     name = 'seattletimes-auth'
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
+
+    custom_settings = {'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-articles.json'}
 
     headers = {
         'Accept': '*/*',
@@ -59,8 +61,8 @@ class SeattleTimesSpider(Spider):
     def auth_login(self, response):
         page_num = 1
         # TODO: Add flag that turns off while loop when there are no more articles (try/while)
-        while page_num <= 1:
-            time.sleep(1)
+        while page_num <= 500:
+            time.sleep(0)
 
             # Example: http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search? \
             # query=the&startdate=2017-01-01&enddate=2017-10-01&sortby=mostrecent&page=1&perpage=200
@@ -109,9 +111,7 @@ class SeattleTimesSpider(Spider):
         siteid = "window.SEATIMESCO.comments.info.siteID"
         post_id_base64 = "window.SEATIMESCO.comments.info.postIDBase64"
 
-        if siteid:
-            article["siteid"] = siteid
-            article["post_id_base64"] = post_id_base64
+
 
         script_header_settings = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]').extract()[0].encode('utf-8').strip()
 
@@ -131,6 +131,10 @@ class SeattleTimesSpider(Spider):
         for key, value in settings_dict.iteritems():
             value = re.sub(self.full_pattern, '', value)
             settings_dict[key] = value
+
+        if settings_dict[siteid]:
+            article["siteid"] = settings_dict[siteid]
+            article["post_id_base64"] = settings_dict[post_id_base64]
 
         commentjs_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + settings_dict[siteid] + '/' + settings_dict[post_id_base64] + '=/init'
 
@@ -164,11 +168,10 @@ class SeattleTimesSpider(Spider):
             article['articleURL'] = ''
 
         author = response.xpath('//*[contains(@class, "p-author")]')
-        for auth in author:
-            if auth == author[0]:
-                article['author'] = remove_tags(author[0].extract()).encode('utf-8')
-            elif auth == author[1]:
-                article['authorAffiliation'] = remove_tags(author[1].extract()).encode('utf-8')
+        if author:
+            article['author'] = remove_tags(author[0].extract()).encode('utf-8')
+        else:
+            article['author'] = ''
 
         # Parse URL and extract text between / + / for category designation
         o = urlparse(response.url)
@@ -181,13 +184,18 @@ class SeattleTimesSpider(Spider):
         else:
             article['category'] = ''
 
-        for sel in response.xpath('//*[contains(@id, "article-content")]'):
-            paragraphs = sel.xpath('//p').extract()
-            stripped = []
-            for index, para in enumerate(paragraphs):
-                stripped += str(remove_tags(para).encode('utf-8')).strip()
-            # rejoin list of strings into one
-            article['body'] = ''.join(stripped)
+
+        article_content = response.xpath('//*[contains(@id, "article-content")]')
+        if article_content:
+            for sel in article_content:
+                paragraphs = sel.xpath('//p').extract()
+                stripped = []
+                for index, para in enumerate(paragraphs):
+                    stripped += str(remove_tags(para).encode('utf-8')).strip()
+                # rejoin list of strings into one
+                article['body'] = ''.join(stripped)
+        else:
+            article['body'] = ''
 
         self.articleCount += 1
 

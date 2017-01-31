@@ -32,7 +32,7 @@ NEWSPIDER_MODULE = 'seattletimes.spiders'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
-DOWNLOAD_DELAY = 0.0
+DOWNLOAD_DELAY = 0.1
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 # CONCURRENT_REQUESTS = 32
@@ -91,9 +91,15 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 16
 
 # Configure item pipelines
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
-#  ITEM_PIPELINES = {
-#      'seattletimes.pipelines.SeattletimesPipeline': 100,
-#  }
+ITEM_PIPELINES = {
+    'seattletimes.pipelines.SQLStore': 300,
+    #'seattletimes.pipelines.MongoPipeline': 500
+}
+MONGODB_SERVER = "bambooiq.ddns.net"
+MONGODB_PORT = 23717
+MONGODB_DB = "twitter"
+MONGODB_COLLECTION = "--authenticationDatabase twitter"
+
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # # See http://doc.scrapy.org/en/latest/topics/autothrottle.html

@@ -11,7 +11,6 @@ import scrapy
 class SeattletimesArticle(scrapy.Item):
     # define the fields for your item here like:
     title = scrapy.Field()
-    link = scrapy.Field()
     body = scrapy.Field()
     date = scrapy.Field()
     articleURL = scrapy.Field()
@@ -31,7 +30,7 @@ class SeattletimesProfile(scrapy.Item):
     datejoined = scrapy.Field()
     location = scrapy.Field()
     about = scrapy.Field()
-    articleID = scrapy.Field()
+    profileid = scrapy.Field()
 
     pass
 

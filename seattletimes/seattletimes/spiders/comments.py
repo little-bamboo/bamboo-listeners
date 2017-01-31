@@ -10,6 +10,8 @@ from sqlalchemy import create_engine
 
 from seattletimes.items import SeattletimesComment
 
+# TODO: Check if url in response body is init, head, or page number
+
 
 class CommentSpider(Spider):
 
@@ -18,7 +20,9 @@ class CommentSpider(Spider):
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
-
+    custom_settings = {
+        'FEED_URI': '../../../../data/seattletimes/seattletimes-2016-05-01-comments.json'
+    }
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -49,7 +53,7 @@ class CommentSpider(Spider):
         conn = engine.connect()
 
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + " LIMIT 10").fetchall()
+            "SELECT articleID,commentjsURL FROM " + self.table_name + " LIMIT 100").fetchall()
 
         counter = 0
         for item in comment_url_article_list:
@@ -71,8 +75,6 @@ class CommentSpider(Spider):
         comment_json = json.loads(response.body_as_unicode())
         article_id = response.meta['articleid']
 
-        # TODO: Check if url in response body is init, head, or page number
-
         comment_header = comment_json['headDocument']['content']
         article_url_id = comment_json['collectionSettings']['bootstrapUrl']
 
@@ -83,18 +85,14 @@ class CommentSpider(Spider):
         com_pages = comment_json['collectionSettings']['archiveInfo']['nPages']
         com_page_info = comment_json['collectionSettings']['archiveInfo']['pageInfo']
 
-        if com_page_info:
-            com_dict['pages'] = com_pages
-        else:
-            com_dict['pages'] = ''
-
-        if com_dict['pages']:
+        if com_page_info and com_pages:
             for val in range(0, com_pages):
                 page_number = str(val)
                 print("Page #: " + str(page_number))
                 json_n_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/' + post_id_base64 + '/' + page_number + '.json'
 
-                return Request(json_n_url, self.parse_add_comments, meta={'comment_item': comment_item, 'article_id': article_id, 'page_num': com_pages})
+                return Request(json_n_url, self.parse_add_comments,
+                               meta={'comment_item': comment_item, 'article_id': article_id, 'page_num': com_pages})
 
         else:
             if comment_header:
@@ -105,7 +103,7 @@ class CommentSpider(Spider):
     def parse_add_comments(self, response):
         print('parse additional comments')
         article_id = response.meta['article_id']
-        comment_add_item = SeattletimesComment
+        comment_add_item = SeattletimesComment()
         add_comment_json = json.loads(response.body_as_unicode())
         comment_content = add_comment_json['content']
 
