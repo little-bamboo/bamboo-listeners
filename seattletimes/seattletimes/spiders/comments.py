@@ -21,7 +21,7 @@ class CommentSpider(Spider):
 
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
     custom_settings = {
-        'FEED_URI': '../../../../data/seattletimes/seattletimes-2016-05-01-comments.json'
+        'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-comments.json'
     }
     headers = {
         'Accept': '*/*',
@@ -42,7 +42,7 @@ class CommentSpider(Spider):
         self.app_name = "comments"
 
         self.filename = "seattletimes-comments"
-        self.table_name = "bs_articlesList"
+        self.table_name = "bs_articleList"
 
     # Override parse endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
@@ -53,7 +53,7 @@ class CommentSpider(Spider):
         conn = engine.connect()
 
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + " LIMIT 100").fetchall()
+            "SELECT articleID,commentjsURL FROM " + self.table_name + " LIMIT 1000").fetchall()
 
         counter = 0
         for item in comment_url_article_list:
@@ -64,19 +64,31 @@ class CommentSpider(Spider):
             if comment_url:
                 counter += 1
                 print(str(counter) + ' ' + comment_url)
-                # TODO: Pass articleid and counter variables in meta?
-                yield scrapy.Request(url=comment_url, callback=self.get_comments, meta={'articleid': articleid})
+                yield scrapy.Request(url=comment_url, callback=self.get_comment_pages, meta={'articleid': articleid})
 
-    def get_comments(self, response):
-        print("get_comments - " + str(response.url))
-        com_dict = {}
-        com_list = []
-        comment_item = SeattletimesComment()
+    def get_comment_pages(self, response):
+
+        # Create a dictionary to carry any comments found in init
+        comment_items = []
+        comment_item = {}
         comment_json = json.loads(response.body_as_unicode())
+
+        # Set meta for passing to next comment string
+        # Stored in the articleid
         article_id = response.meta['articleid']
 
-        comment_header = comment_json['headDocument']['content']
+        comment_head_document = comment_json['headDocument']['content']
         article_url_id = comment_json['collectionSettings']['bootstrapUrl']
+
+
+        for com in comment_head_document:
+            try:
+                comment_item['bodyHtml'] = com['bodyHtml']
+                comment_item['articleID'] = article_id
+                comment_items.append(comment_item)
+            except KeyError, e:
+                #print('keyerror: ' + str(e))
+                pass
 
         # Extract article meta id
         parsed_url = article_url_id.split('/')
@@ -86,28 +98,55 @@ class CommentSpider(Spider):
         com_page_info = comment_json['collectionSettings']['archiveInfo']['pageInfo']
 
         if com_page_info and com_pages:
-            for val in range(0, com_pages):
+            # We can assume the page has comments, make sure they get passed
+
+            # Build the list of URLs to parse  We will use the init to build the list
+            # Init will also be passed as this first step doesn't return an item
+            json_n_url_list = []
+            json_n_url_list.append(response.url)
+
+            # Build the iterator using the number supplied in the json feed
+            for val in range(com_pages):
                 page_number = str(val)
                 print("Page #: " + str(page_number))
-                json_n_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/' + post_id_base64 + '/' + page_number + '.json'
 
-                return Request(json_n_url, self.parse_add_comments,
-                               meta={'comment_item': comment_item, 'article_id': article_id, 'page_num': com_pages})
+                # Now use the post id and page num to build the URL that will be stored in the url list
+                json_n_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/' + post_id_base64 + '/' + page_number + '.json'
+                json_n_url_list.append(json_n_url)
+
+            # Now yield through the list of URLs
+            for n_url in json_n_url_list:
+                yield scrapy.Request(url=n_url, callback=self.parse_comment_tree, meta={'comment_item': comment_items, 'article_id': article_id})
 
         else:
-            if comment_header:
-                comment_item['commentStream'] = comment_header
-                comment_item['articleID'] = article_id
-                return comment_item
+            if comment_items:
+                for comment_dict_item in comment_items:
+                    yield comment_dict_item
 
-    def parse_add_comments(self, response):
+    def parse_comment_tree(self, response):
         print('parse additional comments')
-        article_id = response.meta['article_id']
-        comment_add_item = SeattletimesComment()
-        add_comment_json = json.loads(response.body_as_unicode())
-        comment_content = add_comment_json['content']
 
-        if comment_content:
-            comment_add_item['commentStream'] = comment_content
-            comment_add_item['articleID'] = article_id
-            return comment_add_item
+        # Create comment item and comment list to hold the individual comments
+        comment_item = SeattletimesComment()
+        comment_list = []
+
+        article_id = response.meta['article_id']
+        comment_json = json.loads(response.body_as_unicode())
+
+        # Build the comment dict and test if its available
+        comment_dict_list = comment_json['content']
+
+        if comment_dict_list:
+            for item in comment_dict_list:
+                try:
+                    comment_item['bodyHtml'] = item['content']['bodyHtml']
+                    comment_item['id'] = item['content']['id']
+                    comment_item['articleID'] = article_id
+                    comment_item['commentAuthor'] = item['content']['authorId']
+                    comment_item['parentID'] = item['content']['parentId']
+                    comment_item['createdAt'] = item['content']['createdAt']
+                    #print comment_item
+                    yield comment_item
+                except KeyError, e:
+                    #print("keyerror: ", e)
+                    pass

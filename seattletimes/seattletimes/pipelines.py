@@ -27,16 +27,26 @@ class SQLStore(object):
 
 
     def process_item(self, item, spider):
+        if isinstance(item, SeattletimesArticle):
+            try:
+                self.cursor.execute("""INSERT INTO bs_articleList(title, articleURL, body, post_id, articleID, author, category, commentjsURL, `date`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", \
+                                    (item['title'], item['articleURL'], item['body'], item['post_id_base64'], \
+                                     item['articleID'], item['author'], item['category'], item['commentjsURL'], item['date']))
+                self.conn.commit()
 
-        try:
-            self.cursor.execute("""INSERT INTO bs_articleList(title, articleURL, body, post_id, articleID, author, category, commentjsURL, `date`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", \
-                                (item['title'], item['articleURL'], item['body'], item['post_id_base64'], \
-                                 item['articleID'], item['author'], item['category'], item['commentjsURL'], item['date']))
-            self.conn.commit()
+            except MySQLdb.Error, e:
+                print "Error %d: %s" % (e.args[0], e.args[1])
 
-        except MySQLdb.Error, e:
-            print "Error %d: %s" % (e.args[0], e.args[1])
+            if item is not None:
+                return item
 
+        elif isinstance(item, SeattletimesComment):
+            try:
+                self.cursor.execute("""INSERT INTO bs_commentList(bodyHtml, articleID, id, commentAuthor, parentID, createdAt) VALUES (%s, %s, %s, %s, %s, %s)""", (item['bodyHtml'], item['articleID'], item['id'], item['commentAuthor'], item['parentID'], item['createdAt']))
+                self.conn.commit()
+
+            except MySQLdb.Error, e:
+                print "Error %d: %s" % (e.args[0], e.args[1])
         if item is not None:
             return item
 

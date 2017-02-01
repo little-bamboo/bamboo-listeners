@@ -36,9 +36,11 @@ class SeattletimesProfile(scrapy.Item):
 
 
 class SeattletimesComment(scrapy.Item):
+    bodyHtml = scrapy.Field()
     commentNum = scrapy.Field()
-    commentStream = scrapy.Field()
     commentAuthor = scrapy.Field()
-    commentAuthorURL = scrapy.Field()
+    parentID = scrapy.Field()
     articleID = scrapy.Field()
+    id = scrapy.Field()
+    createdAt = scrapy.Field()
     pass

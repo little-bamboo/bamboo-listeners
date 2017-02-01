@@ -111,8 +111,6 @@ class SeattleTimesSpider(Spider):
         siteid = "window.SEATIMESCO.comments.info.siteID"
         post_id_base64 = "window.SEATIMESCO.comments.info.postIDBase64"
 
-
-
         script_header_settings = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]').extract()[0].encode('utf-8').strip()
 
         # Collect the necessary settings to build the xhr response for the comments
