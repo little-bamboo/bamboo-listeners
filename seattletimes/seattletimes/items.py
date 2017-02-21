@@ -31,16 +31,17 @@ class SeattletimesProfile(scrapy.Item):
     location = scrapy.Field()
     about = scrapy.Field()
     profileid = scrapy.Field()
-
     pass
 
 
 class SeattletimesComment(scrapy.Item):
     bodyHtml = scrapy.Field()
-    commentNum = scrapy.Field()
-    commentAuthor = scrapy.Field()
+    profileID = scrapy.Field()
     parentID = scrapy.Field()
     articleID = scrapy.Field()
     id = scrapy.Field()
-    createdAt = scrapy.Field()
+    createdDate = scrapy.Field()
+    displayName = scrapy.Field()
+    profileURL = scrapy.Field()
+    likedBy = scrapy.Field()
     pass

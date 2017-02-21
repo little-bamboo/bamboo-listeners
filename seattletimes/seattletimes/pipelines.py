@@ -8,6 +8,7 @@
 import sys
 import MySQLdb
 import pymongo
+import pprint
 
 import hashlib
 from scrapy.exceptions import DropItem
@@ -29,20 +30,40 @@ class SQLStore(object):
     def process_item(self, item, spider):
         if isinstance(item, SeattletimesArticle):
             try:
-                self.cursor.execute("""INSERT INTO bs_articleList(title, articleURL, body, post_id, articleID, author, category, commentjsURL, `date`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", \
+                self.cursor.execute("""INSERT INTO bs_articleList(title, articleURL, body, postID, articleID, author, category, commentjsURL, createdDate) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""", \
                                     (item['title'], item['articleURL'], item['body'], item['post_id_base64'], \
-                                     item['articleID'], item['author'], item['category'], item['commentjsURL'], item['date']))
+                                     item['articleID'], item['author'], item['category'], item['commentjsURL'], item['createdDate']))
+
+
+
+
+
+
+
                 self.conn.commit()
 
             except MySQLdb.Error, e:
                 print "Error %d: %s" % (e.args[0], e.args[1])
 
             if item is not None:
+                pprint.pprint(item)
                 return item
 
         elif isinstance(item, SeattletimesComment):
             try:
-                self.cursor.execute("""INSERT INTO bs_commentList(bodyHtml, articleID, id, commentAuthor, parentID, createdAt) VALUES (%s, %s, %s, %s, %s, %s)""", (item['bodyHtml'], item['articleID'], item['id'], item['commentAuthor'], item['parentID'], item['createdAt']))
+                self.cursor.execute("""INSERT INTO bs_commentList(bodyHtml, articleID, commentID, profileID, parentID, createdDate, displayName, profileURL) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""", (item['bodyHtml'], item['articleID'], item['id'], item['profileID'], item['parentID'], item['createdDate'], item['displayName'], item['profileURL']))
+                self.conn.commit()
+
+            except MySQLdb.Error, e:
+                print "Error %d: %s" % (e.args[0], e.args[1])
+
+        if item is not None:
+            pprint.pprint(item)
+            return item
+
+        elif isinstance(item, SeattletimesProfile):
+            try:
+                self.cursor.execute("""INSERT INTO bs_profileList(profileName, dateJoined, about) VALUES (%s, %s, %s)""", (item['name'], item['dateJoined'], item['about']))
                 self.conn.commit()
 
             except MySQLdb.Error, e:

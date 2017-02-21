@@ -8,7 +8,7 @@ import re
 import sqlalchemy
 from sqlalchemy import create_engine
 
-from seattletimes.items import SeattletimesComment
+from seattletimes.items import SeattletimesComment, SeattletimesProfile
 
 # TODO: Check if url in response body is init, head, or page number
 
@@ -44,7 +44,7 @@ class CommentSpider(Spider):
         self.filename = "seattletimes-comments"
         self.table_name = "bs_articleList"
 
-    # Override parse endpoint into the class that begins the event flow once a response from the start_urls
+    # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Get table column for articleid and commentjsurl
 
@@ -52,8 +52,10 @@ class CommentSpider(Spider):
         engine = create_engine('mysql+mysqlconnector://dbBambooDev:B@mboo99@bambooiq.ddns.net:3306/dbBambooDev')
         conn = engine.connect()
 
+        # Add 'LIMIT 200' to query for testing
+        # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + " LIMIT 1000").fetchall()
+            "SELECT articleID,commentjsURL FROM " + self.table_name + "").fetchall()
 
         counter = 0
         for item in comment_url_article_list:
@@ -119,9 +121,8 @@ class CommentSpider(Spider):
                 yield scrapy.Request(url=n_url, callback=self.parse_comment_tree, meta={'comment_item': comment_items, 'article_id': article_id})
 
         else:
-            if comment_items:
-                for comment_dict_item in comment_items:
-                    yield comment_dict_item
+            # print("no comments")
+            pass
 
     def parse_comment_tree(self, response):
         print('parse additional comments')
@@ -135,6 +136,8 @@ class CommentSpider(Spider):
 
         # Build the comment dict and test if its available
         comment_dict_list = comment_json['content']
+        profile_dict_list = comment_json['authors']
+
 
         if comment_dict_list:
             for item in comment_dict_list:
@@ -142,11 +145,12 @@ class CommentSpider(Spider):
                     comment_item['bodyHtml'] = item['content']['bodyHtml']
                     comment_item['id'] = item['content']['id']
                     comment_item['articleID'] = article_id
-                    comment_item['commentAuthor'] = item['content']['authorId']
+                    comment_item['profileID'] = item['content']['authorId']
                     comment_item['parentID'] = item['content']['parentId']
-                    comment_item['createdAt'] = item['content']['createdAt']
-                    #print comment_item
+                    comment_item['createdDate'] = item['content']['createdAt']
+                    comment_item['displayName'] = profile_dict_list[item['content']['authorId']]['displayName']
+                    comment_item['profileURL'] = profile_dict_list[item['content']['authorId']]['profileUrl']
                     yield comment_item
                 except KeyError, e:
-                    #print("keyerror: ", e)
+                    # print("keyerror: ", e)
                     pass

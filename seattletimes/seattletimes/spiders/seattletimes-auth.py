@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# encoding: utf-8
+
 from scrapy.spiders import Spider
 import scrapy
 from scrapy.utils.markup import remove_tags
@@ -200,5 +203,3 @@ class SeattleTimesSpider(Spider):
         print(str(self.articleCount) + ' ' + article['date'] + ' ' + article['title'] + ' ' + article['articleURL'])
 
         return article
-
-
