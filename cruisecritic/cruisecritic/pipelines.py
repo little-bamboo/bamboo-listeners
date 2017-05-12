@@ -16,13 +16,13 @@ db=MySQLdb.connect
 
 class CruisecriticPipeline(object):
     def __init__(self):
-        self.conn = MySQLdb.connect('bambooiq.ddns.net', 'dbBambooDev', 'B@mboo99', 'dbBambooDev', charset="utf8", use_unicode=True)
+        self.conn = MySQLdb.connect('10.0.1.10', 'briansc', 'B@mboo99', 'django', charset="utf8", use_unicode=True)
         self.cursor = self.conn.cursor()
 
 
     def process_item(self, item, spider):
         try:
-            # self.cursor.execute("""INSERT INTO dbBambooDev.cc VALUES (%s)""", (item['name']))
+            # self.cursor.execute("""INSERT INTO django.cc VALUES (%s)""", (item['name']))
 
             #self.conn.commit()
 

@@ -2,13 +2,15 @@ from scrapy.spiders import Spider
 import scrapy
 from scrapy.http import Request
 
+import time
+
 import json
 import re
 
 import sqlalchemy
 from sqlalchemy import create_engine
 
-from seattletimes.items import SeattletimesComment, SeattletimesProfile
+from seattletimes.items import SeattletimesProfile
 
 ##
 # Sample profile URL - capture name, location, about, liked_count, comment_count, date_joined
@@ -46,14 +48,14 @@ class ProfilesSpider(Spider):
         self.app_name = "profiles"
 
         self.filename = "seattletimes-profiles"
-        self.table_name = "bs_profileList"
+        self.table_name = "bs_commentList"
 
     # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Get list of profileURLs from comment db
 
         print ("reading articles table for comment URL list")
-        engine = create_engine('mysql+mysqlconnector://dbBambooDev:B@mboo99@bambooiq.ddns.net:3306/dbBambooDev')
+        engine = create_engine('mysql+mysqlconnector://briansc:BigBamboo99@10.0.1.10:3306/django')
         conn = engine.connect()
 
         # Add 'LIMIT 200' to query for testing
@@ -77,15 +79,68 @@ class ProfilesSpider(Spider):
 
                 unicode_display_name = unicode(display_name)
                 profile_url_unicode = self.base_profile_url+unicode_display_name
-
-                yield scrapy.Request(url=profile_url_unicode, callback=self.get_profile_page)
+                time.sleep(0.1)
+                yield scrapy.Request(url=profile_url_unicode, callback=self.get_profile_page, meta={'profileID': profile_id})
 
     def get_profile_page(self, response):
         # obtain profile information from profile page
-        print(response)
+        data = response.body_as_unicode().replace('\\n', ' ')
+        profile_id = response.meta['profileID']
 
-        # Get the response.url and convert it to json object
-        # enumerate through the json object and pull out profiles
-        # build out a list that
-        # parse the elements and assign to a list
-        # yield
+        profile_item = SeattletimesProfile()
+
+        json_data = json.loads(data)
+
+        about = ''
+        comment_count = 0;
+        profile_created = ''
+        display_name = ''
+        location = ''
+        comment_likes = 0
+
+        try:
+
+            comment_count = json_data['commentCount']
+            about = json_data['profiledata']['about']
+            profile_created = json_data['profiledata']['datecreated']
+            display_name = json_data['profiledata']['displayname']
+            location = json_data['profiledata']['location']
+            comment_likes = json_data['receivedLikes']
+        except KeyError, err:
+            print err
+
+        if comment_count:
+            profile_item['commentCount'] = comment_count
+        else:
+            profile_item['commentCount'] = ''
+
+        if about:
+            profile_item['about'] = about
+        else:
+            profile_item['about'] = ''
+
+        if profile_created:
+            profile_item['profileCreated'] = profile_created
+        else:
+            profile_item['profileCreated'] = ''
+
+        if display_name:
+            profile_item['displayName'] = display_name
+        else:
+            profile_item['displayName'] = ''
+
+        if location:
+            profile_item['location'] = location
+        else:
+            profile_item['location'] = ''
+
+        if comment_likes:
+            profile_item['commentLikes'] = comment_likes
+        else:
+            profile_item['commentLikes'] = 0
+
+        profile_item['profileID'] = profile_id
+
+        # print profile_item
+
+        yield profile_item

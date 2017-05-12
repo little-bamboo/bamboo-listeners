@@ -95,10 +95,10 @@ ITEM_PIPELINES = {
     'seattletimes.pipelines.SQLStore': 300,
     #'seattletimes.pipelines.MongoPipeline': 500
 }
-MONGODB_SERVER = "bambooiq.ddns.net"
-MONGODB_PORT = 23717
-MONGODB_DB = "twitter"
-MONGODB_COLLECTION = "--authenticationDatabase twitter"
+# MONGODB_SERVER = "bambooiq.ddns.net"
+# MONGODB_PORT = 23717
+# MONGODB_DB = "twitter"
+# MONGODB_COLLECTION = "--authenticationDatabase twitter"
 
 
 # Enable and configure the AutoThrottle extension (disabled by default)

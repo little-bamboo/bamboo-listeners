@@ -8,7 +8,7 @@ import re
 import sqlalchemy
 from sqlalchemy import create_engine
 
-from seattletimes.items import SeattletimesComment, SeattletimesProfile
+from seattletimes.items import SeattletimesComment
 
 # TODO: Check if url in response body is init, head, or page number
 
@@ -49,13 +49,17 @@ class CommentSpider(Spider):
         # Get table column for articleid and commentjsurl
 
         print ("reading articles table for comment URL list")
-        engine = create_engine('mysql+mysqlconnector://dbBambooDev:B@mboo99@bambooiq.ddns.net:3306/dbBambooDev')
+        engine = create_engine('mysql+mysqlconnector://briansc:BigBamboo99@10.0.1.10:3306/django')
         conn = engine.connect()
 
         # Add 'LIMIT 200' to query for testing
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + "").fetchall()
+            "SELECT articleID,commentjsURL FROM " + self.table_name + " WHERE DATE(date) >= DATE('2017-03-15')").fetchall()
+
+
+        comment_list_count = len(comment_url_article_list)
+        print comment_list_count
 
         counter = 0
         for item in comment_url_article_list:
@@ -152,5 +156,5 @@ class CommentSpider(Spider):
                     comment_item['profileURL'] = profile_dict_list[item['content']['authorId']]['profileUrl']
                     yield comment_item
                 except KeyError, e:
-                    # print("keyerror: ", e)
+                    #print("Keyerror: ", e)
                     pass

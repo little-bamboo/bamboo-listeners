@@ -28,6 +28,8 @@ class SeattleTimesSpider(Spider):
 
     custom_settings = {'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-articles.json'}
 
+    full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
+
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -49,8 +51,6 @@ class SeattleTimesSpider(Spider):
         self.articleCount = 0
         self.filename = "seattletimes" + '_' + self.searchterm + '_' + self.startdate
 
-    full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
-
     # Override parse endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Push authentication
@@ -60,7 +60,7 @@ class SeattleTimesSpider(Spider):
             callback=self.auth_login
         )
 
-    # Obtain the response from the login and
+    # Obtain the response from the login and yield the search request
     def auth_login(self, response):
         page_num = 1
         # TODO: Add flag that turns off while loop when there are no more articles (try/while)
@@ -192,14 +192,12 @@ class SeattleTimesSpider(Spider):
                 paragraphs = sel.xpath('//p').extract()
                 stripped = []
                 for index, para in enumerate(paragraphs):
-                    stripped += str(remove_tags(para).encode('utf-8')).strip()
+                    stripped += str(remove_tags(para).encode('unicode_escape')).strip()
                 # rejoin list of strings into one
                 article['body'] = ''.join(stripped)
         else:
             article['body'] = ''
 
         self.articleCount += 1
-
-        print(str(self.articleCount) + ' ' + article['date'] + ' ' + article['title'] + ' ' + article['articleURL'])
 
         return article
