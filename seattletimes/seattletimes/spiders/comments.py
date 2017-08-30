@@ -20,9 +20,7 @@ class CommentSpider(Spider):
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
-    custom_settings = {
-        'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-comments.json'
-    }
+
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -34,29 +32,33 @@ class CommentSpider(Spider):
     }
 
     # Call super and initialize external variables
-    def __init__(self, date='', search='', datapath=''):
+    def __init__(self, date='', search='', datapath='', mysqlauth='../../config/mysqlauth.json'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
         print("sqlalchemy version: " + str(sqlalchemy.__version__))
         self.app_name = "comments"
 
-        self.filename = "seattletimes-comments"
-        self.table_name = "bs_articleList"
+        mysql_auth = json.loads(open(mysqlauth, 'r').read())
+        self.user = mysql_auth['user']
+        self.password = mysql_auth['password']
+        self.database = mysql_auth['database']
+        self.host = mysql_auth['host']
+        self.port = mysql_auth['port']
+        self.table_name = "article_list"
 
     # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Get table column for articleid and commentjsurl
 
         print ("reading articles table for comment URL list")
-        engine = create_engine('mysql+mysqlconnector://briansc:BigBamboo99@10.0.1.10:3306/django')
+        engine = create_engine('mysql+mysqlconnector://'+self.user+':'+self.password+'@'+self.host+':'+self.port+'/'+self.database)
         conn = engine.connect()
 
         # Add 'LIMIT 200' to query for testing
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
             "SELECT articleID,commentjsURL FROM " + self.table_name + " WHERE DATE(date) >= DATE('2017-03-15')").fetchall()
-
 
         comment_list_count = len(comment_url_article_list)
         print comment_list_count
@@ -131,10 +133,6 @@ class CommentSpider(Spider):
     def parse_comment_tree(self, response):
         print('parse additional comments')
 
-        # Create comment item and comment list to hold the individual comments
-        comment_item = SeattletimesComment()
-        comment_list = []
-
         article_id = response.meta['article_id']
         comment_json = json.loads(response.body_as_unicode())
 
@@ -146,6 +144,7 @@ class CommentSpider(Spider):
         if comment_dict_list:
             for item in comment_dict_list:
                 try:
+                    comment_item = SeattletimesComment()
                     comment_item['bodyHtml'] = item['content']['bodyHtml']
                     comment_item['id'] = item['content']['id']
                     comment_item['articleID'] = article_id
@@ -156,5 +155,5 @@ class CommentSpider(Spider):
                     comment_item['profileURL'] = profile_dict_list[item['content']['authorId']]['profileUrl']
                     yield comment_item
                 except KeyError, e:
-                    #print("Keyerror: ", e)
+                    print("Keyerror: ", e)
                     pass

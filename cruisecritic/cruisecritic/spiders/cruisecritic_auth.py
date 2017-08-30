@@ -2,13 +2,9 @@
 
 import scrapy
 from scrapy.http import FormRequest
-
 from loginform import fill_login_form
-
 import re
-
 import time
-from datetime import datetime
 
 from cruisecritic.items import CruisecriticItem
 
@@ -42,7 +38,6 @@ class CruisecriticAuthSpider(scrapy.Spider):
 
         return FormRequest(url, method=method, formdata=args, callback=self.auth_login)
 
-
     def auth_login(self, response):
         print('auth login')
 
@@ -52,25 +47,37 @@ class CruisecriticAuthSpider(scrapy.Spider):
             return
         else:
 
-            user_id = 1
-            # TODO: Add flag that turns off while loop when there are no more articles (try/while)
-            while user_id <= 10:
-                new_url = 'http://boards.cruisecritic.com/member.php?u=' + str(user_id).strip()
+            profile_list_url = 'http://boards.cruisecritic.com/memberlist.php?&pp=100&order=asc&sort=joindate'
 
-                user_id += 1
 
-                yield scrapy.Request(url=new_url, callback=self.obtain_profiles)
 
+            yield scrapy.Request(url=profile_list_url, callback=self.get_page_count)
+
+    def get_page_count(self, response):
+
+        # Capture total number of pages div.page-number
+        #   Parse Page 1 of NUMBER and assign to Number variable
+        #   re.search('Updated: ([\w, ]+)', s).group(1).strip()
+        # while page_num is <= total_num:
+        #
+        # new_url = 'http://boards.cruisecritic.com/memberlist.php?order=ASC&sort=joindate&page=1
+        # profile_page = http://boards.cruisecritic.com/search.php?do=finduser&u=169
+
+        total_pages = response.xpath('//div[@class="page-number"]/text()').re('Page 1 of ([\w, ]+)')[0]
+
+        page_num = 1
+
+        while page_num <= total_pages:
+
+            profile_list_url = 'http://boards.cruisecritic.com/memberlist.php?&pp=100&order=asc&sort=joindate&page=' + str(page_num)
+            page_num += 1
+            # Meter call requests
+            time.sleep(2)
+
+            yield scrapy.Request(url=profile_list_url, callback=self.obtain_profiles)
 
     def obtain_profiles(self, response):
-        time.sleep(0.1)
         item = CruisecriticItem()
 
-        title = response.xpath('//h1/text()').extract()[0].encode('utf-8').strip()
+        print response.xpath('//div[@class="page-number"]/text()')
 
-        item['name'] = title
-
-
-
-        print item
-        return item

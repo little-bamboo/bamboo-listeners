@@ -4,6 +4,8 @@
 from scrapy.spiders import Spider
 import scrapy
 from scrapy.utils.markup import remove_tags
+from scrapy.settings import default_settings
+import requests
 
 import json
 from urlparse import urlparse
@@ -12,6 +14,7 @@ import re
 
 import time
 from datetime import datetime
+import math
 
 from seattletimes.items import SeattletimesArticle
 
@@ -26,8 +29,6 @@ class SeattleTimesSpider(Spider):
     allowed_domains = ['seattletimes.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
-    custom_settings = {'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-articles.json'}
-
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
     headers = {
@@ -41,31 +42,51 @@ class SeattleTimesSpider(Spider):
     }
 
     # Call super and initialize external variables
-    def __init__(self, date='', search='', datapath=''):
+    def __init__(self, startdate='', enddate='', search='', datapath='', username='', password=''):
         # Call super to initialize the instance
         super(Spider, self).__init__()
-        self.startdate = date
-        self.enddate = (str(datetime.now()).split(" ")[0])
-        self.searchterm = search.strip()
+        self.startdate = startdate
+        if enddate is None:
+            self.enddate = (str(datetime.now()).split(" ")[0])
+        else:
+            self.enddate = enddate
 
-        self.articleCount = 0
-        self.filename = "seattletimes" + '_' + self.searchterm + '_' + self.startdate
+        self.searchterm = search.strip()
+        self.username = username
+        self.password = password
+
+        self.articleCount = 1
+        self.filename = "seattletimes" + '_' + self.searchterm + '_' + self.startdate + '-' + self.enddate
+
 
     # Override parse endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Push authentication
         return scrapy.FormRequest.from_response(
             response,
-            formdata={'username': 'briansc@gmail.com', 'password': 'thomas7'},
+            formdata={'username': self.username, 'password': self.password},
             callback=self.auth_login
         )
 
     # Obtain the response from the login and yield the search request
     def auth_login(self, response):
         page_num = 1
-        # TODO: Add flag that turns off while loop when there are no more articles (try/while)
-        while page_num <= 500:
-            time.sleep(0)
+
+        # Call original url to obtain total number of articles only
+        count_url = 'http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
+                  'query=' + self.searchterm + \
+                  '&startdate=' + self.startdate + \
+                  '&enddate=' + self.enddate + \
+                  '&sortby=mostrecent&page=' + str(page_num) + '&perpage=200'
+
+        sample = requests.get(count_url)
+        init_req = json.loads(sample.content)
+
+        # Standard division using int values loses precision.  Converting values to float and round with ceiling
+        page_total = int(math.ceil(float(init_req['total']) / float(200)))
+
+        while page_num <= page_total:
+            time.sleep(0.1)
 
             # Example: http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search? \
             # query=the&startdate=2017-01-01&enddate=2017-10-01&sortby=mostrecent&page=1&perpage=200
@@ -76,8 +97,10 @@ class SeattleTimesSpider(Spider):
                       '&enddate=' + self.enddate + \
                       '&sortby=mostrecent&page=' + str(page_num) + '&perpage=200'
 
+            # Increment page_num as this is the second call
             page_num += 1
 
+            # Send page results to be parsed
             yield scrapy.Request(
                 url=new_url,
                 callback=self.obtain_articles_from_search)
@@ -85,8 +108,6 @@ class SeattleTimesSpider(Spider):
     def obtain_articles_from_search(self, response):
         urls = []
         jsonresponse = json.loads(response.body_as_unicode())
-
-        # TODO: Write jsonresponse to a file (jsonlines format)
 
         for article in jsonresponse['hits']:
             if str(article["fields"]["url"]):

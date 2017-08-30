@@ -16,11 +16,11 @@
 
 # User Defined:
 LOG_LEVEL = 'INFO'
-FEED_EXPORTERS = {
-	'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
-}
-FEED_FORMAT = 'jsonlines'
-FEED_URI = "file.json"
+# FEED_EXPORTERS = {
+# 	'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
+# }
+# FEED_FORMAT = 'jsonlines'
+# FEED_URI = "file.json"
 
 BOT_NAME = 'seattletimes'
 

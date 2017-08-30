@@ -1,6 +1,7 @@
 from scrapy.spiders import Spider
 import scrapy
-from scrapy.http import Request
+
+import urllib
 
 import time
 
@@ -26,9 +27,7 @@ class ProfilesSpider(Spider):
     base_profile_url = 'https://secure.seattletimes.com/accountcenter/profile.js?method=ajax&displayname='
 
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
-    custom_settings = {
-        'FEED_URI': '../../../data/seattletimes/seattletimes-2016-05-01-profiles.json'
-    }
+
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -40,29 +39,34 @@ class ProfilesSpider(Spider):
     }
 
     # Call super and initialize external variables
-    def __init__(self, date='', search='', datapath=''):
+    def __init__(self, date='', search='', datapath='', mysqlauth='../../config/mysqlauth.json'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
         print("sqlalchemy version: " + str(sqlalchemy.__version__))
         self.app_name = "profiles"
-
-        self.filename = "seattletimes-profiles"
-        self.table_name = "bs_commentList"
+        mysql_auth = json.loads(open(mysqlauth, 'r').read())
+        self.user = mysql_auth['user']
+        self.password = mysql_auth['password']
+        self.database = mysql_auth['database']
+        self.host = mysql_auth['host']
+        self.port = mysql_auth['port']
+        self.table_name = "comment_list"
 
     # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
         # Get list of profileURLs from comment db
 
         print ("reading articles table for comment URL list")
-        engine = create_engine('mysql+mysqlconnector://briansc:BigBamboo99@10.0.1.10:3306/django')
+        engine = create_engine('mysql+mysqlconnector://'+self.user+':'+self.password+'@'+self.host+':'+self.port+'/'+self.database)
+        # engine = create_engine('mysql+mysqlconnector://briansc:BigBamboo99@10.0.1.10:3306/django')
+
+
         conn = engine.connect()
 
         # Add 'LIMIT 200' to query for testing
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
-        display_name_list = conn.execute(
-            # Unique records from db_commentList for profileID and profileURL
-            "SELECT DISTINCT displayName, profileID, profileURL FROM " + self.table_name + "").fetchall()
+        display_name_list = conn.execute("SELECT DISTINCT displayName, profileID, profileURL FROM " + self.table_name + "").fetchall()
 
         counter = 0
         for item in display_name_list:
@@ -106,6 +110,7 @@ class ProfilesSpider(Spider):
             display_name = json_data['profiledata']['displayname']
             location = json_data['profiledata']['location']
             comment_likes = json_data['receivedLikes']
+
         except KeyError, err:
             print err
 
@@ -126,8 +131,10 @@ class ProfilesSpider(Spider):
 
         if display_name:
             profile_item['displayName'] = display_name
+            profile_item['profileUrl'] = 'www.seattletimes.com/profile/' + urllib.quote(display_name)
         else:
             profile_item['displayName'] = ''
+            profile_item['profileUrl'] = ''
 
         if location:
             profile_item['location'] = location

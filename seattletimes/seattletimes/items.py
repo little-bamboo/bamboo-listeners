@@ -34,6 +34,7 @@ class SeattletimesProfile(scrapy.Item):
     displayName = scrapy.Field()
     location = scrapy.Field()
     commentLikes = scrapy.Field()
+    profileUrl = scrapy.Field()
     pass
 
 
