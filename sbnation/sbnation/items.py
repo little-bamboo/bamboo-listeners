@@ -8,20 +8,46 @@
 import scrapy
 
 
-class SBNationItem(scrapy.Item):
+class SBNationArticle(scrapy.Item):
     # define the fields for your item here like:
-    aTitle = scrapy.Field()
-    aLink = scrapy.Field()
-    aBody = scrapy.Field()
-    aDate = scrapy.Field()
-    aUrl = scrapy.Field()
+    title = scrapy.Field()
+    body = scrapy.Field()
+    created_on = scrapy.Field()
+    url = scrapy.Field()
     searchIndex = scrapy.Field()
     articleID = scrapy.Field()
-    category = scrapy.Field()
-    authorAffiliation = scrapy.Field()
-    aAuthor = scrapy.Field()
+    categories = scrapy.Field()
+    author = scrapy.Field()
     commentNum = scrapy.Field()
-    commentjsURL = scrapy.Field()
     recommendedNum = scrapy.Field()
-    comData = scrapy.Field()
     pass
+
+
+class SBNationComment(scrapy.Item):
+    # define list of fields for sbnation comment stream
+    id = scrapy.Field()
+    parent_id = scrapy.Field()
+    user_id = scrapy.Field()
+    spam_flags = scrapy.Field()
+    troll_flags = scrapy.Field()
+    inappropriate_flags = scrapy.Field()
+    recommended_flags = scrapy.Field()
+    created_timestamp = scrapy.Field()
+    created_on = scrapy.Field()
+    body = scrapy.Field()
+    username = scrapy.Field()
+    title = scrapy.Field()
+    signature = scrapy.Field()
+    article_id = scrapy.Field()
+
+
+class SBNationUser(scrapy.Item):
+    id = scrapy.Field()
+    username = scrapy.Field()
+    created_on = scrapy.Field()
+    profile_url = scrapy.Field()
+    image_url = scrapy.Field()
+    comment_num = scrapy.Field()
+    post_num = scrapy.Field()
+    fan_of = scrapy.Field()
+    blog_membership = scrapy.Field()

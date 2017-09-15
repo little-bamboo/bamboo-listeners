@@ -8,7 +8,7 @@ import datetime
 
 import urllib2
 
-from sbnation.items import SBNationItem
+from sbnation.items import SBNationArticle
 
 class SounderAtHeartSpider(scrapy.Spider):
     name = 'sounderatheart'

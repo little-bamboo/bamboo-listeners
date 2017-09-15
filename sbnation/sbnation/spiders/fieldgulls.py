@@ -2,10 +2,11 @@ import scrapy
 from scrapy.utils.markup import remove_tags
 import json
 import re
-
 import urllib2
 
-from sbnation.items import SBNationItem
+from datetime import datetime, date
+
+from sbnation.items import SBNationArticle
 
 class FieldGullsSpider(scrapy.Spider):
     name = "fieldgulls"
@@ -28,81 +29,101 @@ class FieldGullsSpider(scrapy.Spider):
     def start_requests(self):
 
         # Build a list of URLs using the search URL and paginating through results
-        search_term = 'sounders'
-        url = 'http://www.fieldgulls.com/search?q=' + search_term
+        search_term = 'seahawks'
+        url = 'http://www.fieldgulls.com/search?order=date&q=' + search_term
         yield scrapy.Request(url=url,headers=self.headers, callback=self.parse_search)
 
     def parse_search(self, response):
 
-        articleLinks = response.css('td.m-profile__activity-table__content a::attr(href)').extract()
+        articleLinks = response.xpath('//div[contains(@class, "c-entry-box--compact--article")]/a/@href').extract()
 
         for article in articleLinks:
             yield scrapy.Request(url=article,headers=self.headers, callback=self.parse_article)
 
-        nextPage = response.css('span.m-pagination__next a::attr(href)').extract()
+        nextPage = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
 
-        if nextPage is not None:
-            for nextUrl in nextPage:
-                nextLink = 'http://www.fieldgulls.com/' + str(nextUrl)
-                print "nextLink: " + nextLink
-                yield scrapy.Request(url=nextLink,headers=self.headers, callback=self.parse_search)
+        try:
+            nextLink = 'http://www.fieldgulls.com' + str(nextPage[0])
+            print "nextLink: " + nextLink
+            yield scrapy.Request(url=nextLink,headers=self.headers, callback=self.parse_search)
+        except Exception, e:
+            print "Error: {0}".format(e)
 
 
     def parse_article(self, response):
-        item = SBNationItem()
+        item = SBNationArticle()
 
         title = response.css('h1.c-page-title').extract()
-        if len(title) > 0:
-            item['aTitle']=remove_tags(title[0].strip())
+        if title:
+            item['title'] = remove_tags(title[0].encode('utf-8').strip())
         else:
-            title
+            item['title'] = 'No Title Found'
 
-        body = response.xpath('/html/body/section/section/div[2]/div[1]/div[1]').extract()
-        if len(body) > 0:
-            item['aBody']=remove_tags(body[0].strip())
+        body = response.css('div.c-entry-content').extract()
+        if body:
+            item['body'] = body[0].encode('utf-8').strip()
         else:
-            body
+            item['body'] = 'No body text found'
+
+        articleID = response.css('body ::attr(data-entry-id)').extract()
+        if articleID:
+            item['articleID'] = articleID[0]
+        else:
+            item['articleID'] = ''
+
+        articleURL = response.url
+        if articleURL:
+            item['url'] = articleURL
+        else:
+            item['url'] = ''
+
+        try:
+            raw_date = response.css('time::text')[0].extract().strip()
+            if raw_date:
+                new_date = raw_date.split(' ')
+                del new_date[-1]
+                # Sample: Sep 12, 2017,  8:00am PDT
+                item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M%p')
+            else:
+                item['created_on'] = date.today().strftime('%Y-%m-%d')
+        except Exception, e:
+            print"Error datetime conversion: {0}".format(e)
+
+        categories = response.css('li.c-entry-group-labels__item a span::text').extract()
+
+        if categories:
+            item['categories'] = ','.join(categories)
+        else:
+            item['categories'] = ''
+
+        search_index = response.request.headers.get('Referer', None).split('=')[-1]
+        if search_index:
+            item['searchIndex'] = search_index
+        else:
+            item['searchIndex'] = ''
 
         cdataId = response.css('div.c-entry-stat--comment ::attr(data-cdata)').extract()
-        # {"id":13686549,"comment_count":108,"recommended_count":0,"url":"http://www.sounderatheart.com/2016/12/12/13922508/brad-evans-option-exercised"}
 
-        if len(cdataId) > 0:
+        if cdataId:
             # Convert cdataId to a json object, store objects into item
             cdata = json.loads(cdataId[0])
-            print cdata
-            item['articleID'] = cdata['id']
             item['commentNum'] = cdata['comment_count']
-            item['aUrl'] = cdata['url']
             item['recommendedNum'] = cdata['recommended_count']
         else:
-            cdataId
+            item['commentNum'] = ''
+            item['recommendedNum'] = ''
 
-        author = response.css('a.c-byline__twitter-handle').extract()
+        author = response.css('span.c-byline__item a::text').extract()
 
-        if len(author) > 0:
-            item['aAuthor'] = remove_tags(author[0])
+        if author:
+            item['author'] = remove_tags(author[0].encode('utf-8'))
         else:
-            author
+            item['author'] = 'No Author'
 
         if 'articleID' in item:
             articleId = str(item['articleID'])
-            commentjsURL = 'http://www.sounderatheart.com/comments/load_comments/' + articleId
+            commentjsURL = 'http://www.fieldgulls.com/comments/load_comments/' + articleId
         else:
             commentjsURL = ""
 
-        # Trigger the comment response using urllib2
-        if commentjsURL:
-            try:
-                commentResponse = urllib2.urlopen(commentjsURL)
-                commentJSON = json.load(commentResponse)
-                item['commentjsURL'] = commentjsURL
-                print "Storing Comments Data"
-                # Store the json comment blob for export as child within each story
-                item['comData']=commentJSON
-
-            except urllib2.HTTPError, e:
-                print "No response: " + str(e.code) + " " + str(e.msg)
-
-        if 'title' in item:
-            print item['title']
         return item
