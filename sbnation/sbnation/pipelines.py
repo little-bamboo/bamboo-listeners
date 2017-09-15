@@ -11,6 +11,7 @@ import MySQLdb
 import logging
 import sys
 
+
 class SbnationPipeline(object):
 
     def __init__(self):
@@ -24,20 +25,27 @@ class SbnationPipeline(object):
         except Exception, e:
             print "Error: {0}".format(e)
 
-        self.conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
-                                    charset="utf8mb4", use_unicode=True)
+        self.conn = MySQLdb.connect(user=self.dbauth['user'],
+                                    passwd=self.dbauth['password'],
+                                    db=self.dbauth['database'],
+                                    host=self.dbauth['host'],
+                                    charset="utf8mb4",
+                                    use_unicode=True)
         self.cursor = self.conn.cursor()
 
     def process_item(self, item, spider):
         if isinstance(item, SBNationArticle):
             try:
-                print "Committing articleID: {0}".format(item['articleID'])
+                print "Committing article_id: {0}".format(item['article_id'])
 
                 # Commit main profile record
-                self.cursor.execute("""REPLACE INTO sbn_articles (title, body, created_on, url, searchIndex, articleID, 
+                self.cursor.execute("""REPLACE INTO sbn_articles (title, body, created_on, url, search_index, article_id, 
                   categories, author, commentNum, recommendNum) VALUES  (%s, %s, %s, %s, %s, %s, %s, %s, 
-                  %s, %s)""", (item['title'], item['body'], item['created_on'], item['url'], item['searchIndex'],
-                               item['articleID'], item['categories'], item['author'], item['commentNum'],
+                  %s, %s)""", (item['title'],
+                               item['body'],
+                               item['created_on'],
+                               item['url'], item['search_index'],
+                               item['article_id'], item['categories'], item['author'], item['commentNum'],
                                item['recommendedNum']))
                 self.conn.commit()
             except MySQLdb.Error, e:

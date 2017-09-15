@@ -35,11 +35,33 @@ class CommentsSpider(CrawlSpider):
     def get_article_ids(self):
         # Get list of article IDs to obtain comments from
         try:
-            query = "SELECT articleID FROM django.sbn_articles ORDER BY created_on DESC"
+
+
+            query = "SELECT article_id FROM django.sbn_articles ORDER BY created_on DESC"
             conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
                                     charset="utf8mb4", use_unicode=True)
             cursor = conn.cursor()
             cursor.execute(query)
+            # Cursor returns a tuple, assign appropriately
+            article_ids = cursor.fetchall()
+
+            # Convert list of tuples into list of strings
+            article_ids = [x[0] for x in article_ids]
+            return article_ids
+
+        except Exception, e:
+            print"Error: {0}".format(e)
+
+    def get_comment_article_ids(self):
+
+        # TODO:  Query for article IDs that already have comments
+        try:
+
+            comment_query = "SELECT article_id FROM django.sbn_comments ORDER BY created_timestamp DESC"
+            conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
+                                    charset="utf8mb4", use_unicode=True)
+            cursor = conn.cursor()
+            cursor.execute(comment_query)
             # Cursor returns a tuple, assign appropriately
             article_ids = cursor.fetchall()
 
@@ -55,9 +77,14 @@ class CommentsSpider(CrawlSpider):
         # Run query on existing database to pull all article IDs
         # iterate through each id and yield scrapy request
 
-        article_ids = self.get_article_ids()
+        article_ids = set(self.get_article_ids())
+        comment_article_ids = set(self.get_comment_article_ids())
 
-        for article_id in article_ids:
+        get_article_ids = article_ids - comment_article_ids
+
+        # Filter out IDs in both lists
+
+        for article_id in get_article_ids:
 
             # Build URL
             commentjsURL = 'https://www.fieldgulls.com/comments/load_comments/' + str(article_id)
@@ -188,5 +215,7 @@ class CommentsSpider(CrawlSpider):
                 user_item['image_url'] = image_url
             else:
                 user_item['image_url'] = ''
+
+            # TODO: Pass user_item dict in scrapy request for User URL
 
             yield user_item

@@ -2,11 +2,10 @@ import scrapy
 from scrapy.utils.markup import remove_tags
 import json
 import re
-import urllib2
-
 from datetime import datetime, date
 
 from sbnation.items import SBNationArticle
+
 
 class FieldGullsSpider(scrapy.Spider):
     name = "fieldgulls"
@@ -20,35 +19,28 @@ class FieldGullsSpider(scrapy.Spider):
          Chrome/48.0.2564.116 Safari/537.36'
     }
 
-    # Useful for stripping unicode and unnecessary characters
-    full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
-
-    def stringReplace(self, string):
-        return re.sub(self.full_pattern, '', string)
-
     def start_requests(self):
 
         # Build a list of URLs using the search URL and paginating through results
         search_term = 'seahawks'
         url = 'http://www.fieldgulls.com/search?order=date&q=' + search_term
-        yield scrapy.Request(url=url,headers=self.headers, callback=self.parse_search)
+        yield scrapy.Request(url=url, headers=self.headers, callback=self.parse_search)
 
     def parse_search(self, response):
 
-        articleLinks = response.xpath('//div[contains(@class, "c-entry-box--compact--article")]/a/@href').extract()
+        article_links = response.xpath('//div[contains(@class, "c-entry-box--compact--article")]/a/@href').extract()
 
-        for article in articleLinks:
-            yield scrapy.Request(url=article,headers=self.headers, callback=self.parse_article)
+        for article in article_links:
+            yield scrapy.Request(url=article, headers=self.headers, callback=self.parse_article)
 
-        nextPage = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
+        next_page = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
 
         try:
-            nextLink = 'http://www.fieldgulls.com' + str(nextPage[0])
-            print "nextLink: " + nextLink
-            yield scrapy.Request(url=nextLink,headers=self.headers, callback=self.parse_search)
+            next_link = 'http://www.fieldgulls.com' + str(next_page[0])
+            print "nextLink: " + next_link
+            yield scrapy.Request(url=next_link, headers=self.headers, callback=self.parse_search)
         except Exception, e:
             print "Error: {0}".format(e)
-
 
     def parse_article(self, response):
         item = SBNationArticle()
@@ -65,15 +57,15 @@ class FieldGullsSpider(scrapy.Spider):
         else:
             item['body'] = 'No body text found'
 
-        articleID = response.css('body ::attr(data-entry-id)').extract()
-        if articleID:
-            item['articleID'] = articleID[0]
+        article_id = response.css('body ::attr(data-entry-id)').extract()
+        if article_id:
+            item['article_id'] = article_id[0]
         else:
-            item['articleID'] = ''
+            item['article_id'] = ''
 
-        articleURL = response.url
-        if articleURL:
-            item['url'] = articleURL
+        article_url = response.url
+        if article_url:
+            item['url'] = article_url
         else:
             item['url'] = ''
 
@@ -98,9 +90,9 @@ class FieldGullsSpider(scrapy.Spider):
 
         search_index = response.request.headers.get('Referer', None).split('=')[-1]
         if search_index:
-            item['searchIndex'] = search_index
+            item['search_index'] = search_index
         else:
-            item['searchIndex'] = ''
+            item['search_index'] = ''
 
         cdataId = response.css('div.c-entry-stat--comment ::attr(data-cdata)').extract()
 
