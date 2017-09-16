@@ -105,6 +105,7 @@ class CommentsSpider(CrawlSpider):
         # Run query on existing database to pull all article IDs
         # iterate through each id and yield scrapy request
 
+        # TODO: Refactor get article IDs methods to a single method
         if self.get_new_article_comments:
             article_ids = set(self.get_article_ids())
             comment_article_ids = set(self.get_comment_article_ids())

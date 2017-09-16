@@ -76,7 +76,7 @@ class FieldGullsSpider(scrapy.Spider):
                 new_date = raw_date.split(' ')
                 del new_date[-1]
                 # Sample: Sep 12, 2017,  8:00am PDT
-                item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M')
+                item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M%p')
             else:
                 item['created_on'] = date.today().strftime('%Y-%m-%d')
         except Exception, e:
