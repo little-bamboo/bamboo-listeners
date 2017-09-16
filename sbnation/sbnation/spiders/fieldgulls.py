@@ -9,7 +9,7 @@ from sbnation.items import SBNationArticle
 
 class FieldGullsSpider(scrapy.Spider):
     name = "fieldgulls"
-
+    next_flag = False
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -33,14 +33,15 @@ class FieldGullsSpider(scrapy.Spider):
         for article in article_links:
             yield scrapy.Request(url=article, headers=self.headers, callback=self.parse_article)
 
-        next_page = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
+        if self.next_flag:
+            next_page = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
 
-        try:
-            next_link = 'http://www.fieldgulls.com' + str(next_page[0])
-            print "nextLink: " + next_link
-            yield scrapy.Request(url=next_link, headers=self.headers, callback=self.parse_search)
-        except Exception, e:
-            print "Error: {0}".format(e)
+            try:
+                next_link = 'http://www.fieldgulls.com' + str(next_page[0])
+                print "nextLink: " + next_link
+                yield scrapy.Request(url=next_link, headers=self.headers, callback=self.parse_search)
+            except Exception, e:
+                print "Error: {0}".format(e)
 
     def parse_article(self, response):
         item = SBNationArticle()
@@ -75,7 +76,7 @@ class FieldGullsSpider(scrapy.Spider):
                 new_date = raw_date.split(' ')
                 del new_date[-1]
                 # Sample: Sep 12, 2017,  8:00am PDT
-                item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M%p')
+                item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M')
             else:
                 item['created_on'] = date.today().strftime('%Y-%m-%d')
         except Exception, e:
@@ -99,11 +100,11 @@ class FieldGullsSpider(scrapy.Spider):
         if cdataId:
             # Convert cdataId to a json object, store objects into item
             cdata = json.loads(cdataId[0])
-            item['commentNum'] = cdata['comment_count']
-            item['recommendedNum'] = cdata['recommended_count']
+            item['comment_num'] = cdata['comment_count']
+            item['recommended_num'] = cdata['recommended_count']
         else:
-            item['commentNum'] = ''
-            item['recommendedNum'] = ''
+            item['comment_num'] = 0
+            item['recommended_num'] = 0
 
         author = response.css('span.c-byline__item a::text').extract()
 
@@ -111,11 +112,5 @@ class FieldGullsSpider(scrapy.Spider):
             item['author'] = remove_tags(author[0].encode('utf-8'))
         else:
             item['author'] = 'No Author'
-
-        if 'articleID' in item:
-            articleId = str(item['articleID'])
-            commentjsURL = 'http://www.fieldgulls.com/comments/load_comments/' + articleId
-        else:
-            commentjsURL = ""
 
         return item

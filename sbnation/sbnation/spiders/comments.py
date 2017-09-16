@@ -6,7 +6,7 @@ import MySQLdb
 import json
 import urllib2
 
-from datetime import date
+from datetime import datetime, timedelta
 
 from sbnation.items import SBNationComment, SBNationUser
 
@@ -14,6 +14,9 @@ from sbnation.items import SBNationComment, SBNationUser
 class CommentsSpider(CrawlSpider):
 
     name = 'comments'
+    update_recent_articles = True
+    get_new_article_comments = False
+    update_all_article_comments = False
 
     def __init__(self):
 
@@ -36,8 +39,7 @@ class CommentsSpider(CrawlSpider):
         # Get list of article IDs to obtain comments from
         try:
 
-
-            query = "SELECT article_id FROM django.sbn_articles ORDER BY created_on DESC"
+            query = "SELECT article_id FROM django.sbn_articles WHERE commentNum > 0 ORDER BY created_on DESC"
             conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
                                     charset="utf8mb4", use_unicode=True)
             cursor = conn.cursor()
@@ -72,17 +74,51 @@ class CommentsSpider(CrawlSpider):
         except Exception, e:
             print"Error: {0}".format(e)
 
+    def get_recent_articles(self):
+        # TODO:  Query for article IDs that already have comments
+        try:
+
+            last_week = datetime.now() - timedelta(days=14)
+            print last_week
+            comment_query = "SELECT article_id FROM sbn_articles WHERE created_on > NOW() - INTERVAL 7 DAY;"
+            conn = MySQLdb.connect(user=self.dbauth['user'],
+                                   passwd=self.dbauth['password'],
+                                   db=self.dbauth['database'],
+                                   host=self.dbauth['host'],
+                                   charset="utf8mb4",
+                                   use_unicode=True)
+            cursor = conn.cursor()
+            cursor.execute(comment_query)
+            # Cursor returns a tuple, assign appropriately
+            article_ids = cursor.fetchall()
+
+            # Convert list of tuples into list of strings
+            article_ids = [x[0] for x in article_ids]
+            return article_ids
+
+        except Exception, e:
+            print"Error: {0}".format(e)
+
+
     def start_requests(self):
 
         # Run query on existing database to pull all article IDs
         # iterate through each id and yield scrapy request
 
-        article_ids = set(self.get_article_ids())
-        comment_article_ids = set(self.get_comment_article_ids())
+        if self.get_new_article_comments:
+            article_ids = set(self.get_article_ids())
+            comment_article_ids = set(self.get_comment_article_ids())
+            get_article_ids = article_ids - comment_article_ids
 
-        get_article_ids = article_ids - comment_article_ids
+        elif self.update_recent_articles:
+            # TODO: Query for articles for the past two weeks
+            print 'updating comments from articles over last two weeks'
+            get_article_ids = self.get_recent_articles()
 
-        # Filter out IDs in both lists
+        elif self.update_all_article_comments:
+            # TODO: Query for all article IDs
+            print 'updating comments for all articles'
+
 
         for article_id in get_article_ids:
 
@@ -92,7 +128,6 @@ class CommentsSpider(CrawlSpider):
 
     def parse_comments(self, response):
 
-        # TODO: Parse User object from comment dict
         item = SBNationComment()
 
         # item = SBNationComment()
@@ -100,7 +135,7 @@ class CommentsSpider(CrawlSpider):
         comment_dict = json.loads(response.text)
 
         for comment in comment_dict['comments']:
-            print comment
+            # print comment
 
             comment_id = comment['id']
             if comment_id:
@@ -184,7 +219,7 @@ class CommentsSpider(CrawlSpider):
 
         users = comment_dict['users']
         for user in users:
-            print user
+
             user_item = SBNationUser()
             username = user['username']
             if username:

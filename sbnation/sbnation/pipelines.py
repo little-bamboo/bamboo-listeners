@@ -44,12 +44,16 @@ class SbnationPipeline(object):
                   %s, %s)""", (item['title'],
                                item['body'],
                                item['created_on'],
-                               item['url'], item['search_index'],
-                               item['article_id'], item['categories'], item['author'], item['commentNum'],
-                               item['recommendedNum']))
+                               item['url'],
+                               item['search_index'],
+                               item['article_id'],
+                               item['categories'],
+                               item['author'],
+                               item['comment_num'],
+                               item['recommended_num']))
                 self.conn.commit()
             except MySQLdb.Error, e:
-                print e[0], e[1]
+                print e[0], e[1], spider
                 self.conn.rollback()
                 self.cursor.close()
                 self.conn.close()

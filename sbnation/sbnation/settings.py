@@ -15,7 +15,7 @@ SPIDER_MODULES = ['sbnation.spiders']
 NEWSPIDER_MODULE = 'sbnation.spiders'
 
 # User Defined:
-# LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'INFO'
 # FEED_EXPORTERS = {
 #  'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
 # }

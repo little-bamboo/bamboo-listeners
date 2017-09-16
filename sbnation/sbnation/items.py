@@ -18,8 +18,8 @@ class SBNationArticle(scrapy.Item):
     article_id = scrapy.Field()
     categories = scrapy.Field()
     author = scrapy.Field()
-    commentNum = scrapy.Field()
-    recommendedNum = scrapy.Field()
+    comment_num = scrapy.Field()
+    recommended_num = scrapy.Field()
     pass
 
 
