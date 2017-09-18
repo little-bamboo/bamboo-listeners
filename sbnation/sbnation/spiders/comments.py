@@ -14,6 +14,8 @@ from sbnation.items import SBNationComment, SBNationUser
 class CommentsSpider(CrawlSpider):
 
     name = 'comments'
+
+    # TODO: Pass in these values as a command line flag
     update_recent_articles = True
     get_new_article_comments = False
     update_all_article_comments = False

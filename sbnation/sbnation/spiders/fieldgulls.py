@@ -9,7 +9,7 @@ from sbnation.items import SBNationArticle
 
 class FieldGullsSpider(scrapy.Spider):
     name = "fieldgulls"
-    next_flag = False
+    next_flag = True
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
