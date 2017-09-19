@@ -54,9 +54,7 @@ class SeattletimesSpider(scrapy.Spider):
 
     """
     
-
     def parse(self, response):
-        print "beginning parse"
 
         # Push authentication
         return scrapy.FormRequest.from_response(
@@ -64,9 +62,6 @@ class SeattletimesSpider(scrapy.Spider):
             formdata={'username': 'briansc@gmail.com', 'password': 'thomas7'},
             callback=self.process_request
         )
-
-        pass
-
 
     def process_request(self, response):
 
@@ -79,3 +74,4 @@ class SeattletimesSpider(scrapy.Spider):
     def parse_result(self, response):
         comments = response.xpath('//*[contains(@class, "fyre-comment-article")]')
         print(comments)
+

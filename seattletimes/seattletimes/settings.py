@@ -32,7 +32,7 @@ NEWSPIDER_MODULE = 'seattletimes.spiders'
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
-DOWNLOAD_DELAY = 0.1
+DOWNLOAD_DELAY = 2
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 # CONCURRENT_REQUESTS = 32
@@ -42,7 +42,7 @@ DOWNLOAD_DELAY = 0.1
 # See also autothrottle settings and docs
 # DOWNLOAD_DELAY = 3
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = 16
+# CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # CONCURRENT_REQUESTS_PER_IP = 16
 
 # Disable cookies (enabled by default)
@@ -70,7 +70,8 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # }
 
 # DOWNLOADER_MIDDLEWARES = {
-#    'seattletimes.middlewares.selenium.SeleniumMiddleware': 200
+#     # 'seattletimes.downloadermiddlewares.httpproxy.HttpProxyMiddleware': 100,
+#     # 'seattletimes.middlewares.selenium.SeleniumMiddleware': 200,
 # }
 
 # DOWNLOADER_MIDDLEWARES = {
@@ -93,7 +94,7 @@ CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # See http://scrapy.readthedocs.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'seattletimes.pipelines.SQLStore': 300,
-    #'seattletimes.pipelines.MongoPipeline': 500
+    # 'seattletimes.pipelines.MongoPipeline': 500
 }
 # MONGODB_SERVER = "bambooiq.ddns.net"
 # MONGODB_PORT = 23717

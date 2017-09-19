@@ -42,7 +42,8 @@ class SeattleTimesSpider(Spider):
     }
 
     # Call super and initialize external variables
-    def __init__(self, startdate='', enddate='', search='', datapath='', username='', password=''):
+    # http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?query=the&startdate=2017-06-19&enddate=2017-09-19&sortby=mostrecent&page=1&perpage=20
+    def __init__(self, startdate='', enddate='', search='*', perpage='200', datapath='', username='briansc@gmail.com', password='thomas7'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
         self.startdate = startdate
@@ -50,6 +51,8 @@ class SeattleTimesSpider(Spider):
             self.enddate = (str(datetime.now()).split(" ")[0])
         else:
             self.enddate = enddate
+
+        self.perpage = perpage
 
         self.searchterm = search.strip()
         self.username = username
@@ -70,40 +73,39 @@ class SeattleTimesSpider(Spider):
 
     # Obtain the response from the login and yield the search request
     def auth_login(self, response):
+
         page_num = 1
 
         # Call original url to obtain total number of articles only
         count_url = 'http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
-                  'query=' + self.searchterm + \
-                  '&startdate=' + self.startdate + \
-                  '&enddate=' + self.enddate + \
-                  '&sortby=mostrecent&page=' + str(page_num) + '&perpage=200'
+                    'query=' + self.searchterm + \
+                    '&startdate=' + self.startdate + \
+                    '&enddate=' + self.enddate + \
+                    '&sortby=mostrecent&page=' + str(page_num) + \
+                    '&perpage=' + str(self.perpage)
 
         sample = requests.get(count_url)
         init_req = json.loads(sample.content)
 
         # Standard division using int values loses precision.  Converting values to float and round with ceiling
-        page_total = int(math.ceil(float(init_req['total']) / float(200)))
-
+        page_total = int(math.ceil(float(init_req['total']) / float(self.perpage)))
+        print"Search API Page Total: {0}".format(page_total)
         while page_num <= page_total:
-            time.sleep(0.1)
-
+            time.sleep(2)
             # Example: http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search? \
             # query=the&startdate=2017-01-01&enddate=2017-10-01&sortby=mostrecent&page=1&perpage=200
 
             new_url = 'http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?' \
-                      'query=' + self.searchterm + \
-                      '&startdate=' + self.startdate + \
-                      '&enddate=' + self.enddate + \
-                      '&sortby=mostrecent&page=' + str(page_num) + '&perpage=200'
+                    'query=' + self.searchterm + \
+                    '&startdate=' + self.startdate + \
+                    '&enddate=' + self.enddate + \
+                    '&sortby=mostrecent&page=' + str(page_num) + \
+                    '&perpage=' + str(self.perpage)
 
             # Increment page_num as this is the second call
             page_num += 1
-
-            # Send page results to be parsed
-            yield scrapy.Request(
-                url=new_url,
-                callback=self.obtain_articles_from_search)
+            print"Search API Page Num: {0}".format(page_num)
+            yield scrapy.Request(url=new_url, headers=self.headers, callback=self.obtain_articles_from_search)
 
     def obtain_articles_from_search(self, response):
         urls = []
@@ -115,7 +117,7 @@ class SeattleTimesSpider(Spider):
 
         for u in urls:
             if u is not None:
-                yield scrapy.Request(u, callback=self.process_article)
+                yield scrapy.Request(url=u, headers=self.headers, callback=self.process_article)
 
             else:
                 print "empty url, moving on..."
@@ -134,6 +136,7 @@ class SeattleTimesSpider(Spider):
 
         siteid = "window.SEATIMESCO.comments.info.siteID"
         post_id_base64 = "window.SEATIMESCO.comments.info.postIDBase64"
+        comments_enabled = "window.SEATIMESCO.comments.info.enabled"
 
         script_header_settings = response.xpath('//script[contains(., "window.SEATIMESCO.comments.info.siteID")]').extract()[0].encode('utf-8').strip()
 
@@ -141,7 +144,7 @@ class SeattleTimesSpider(Spider):
         comment_settings = []
         for line in script_header_settings.split("\n"):
             line = re.sub(r"\s+", "", line, flags=re.UNICODE)
-            if (siteid in line) or (post_id_base64 in line):
+            if (siteid in line) or (post_id_base64 in line) or (comments_enabled in line):
                 comment_settings += [line]
 
         settings_dict = dict(line.split("=", 1) for line in comment_settings)
@@ -158,9 +161,8 @@ class SeattleTimesSpider(Spider):
             article["siteid"] = settings_dict[siteid]
             article["post_id_base64"] = settings_dict[post_id_base64]
 
-        commentjs_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + settings_dict[siteid] + '/' + settings_dict[post_id_base64] + '=/init'
-
-        if commentjs_url:
+        if settings_dict['window.SEATIMESCO.comments.info.enabled'] == 'true':
+            commentjs_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/' + settings_dict[siteid] + '/' + settings_dict[post_id_base64] + '=/init'
             article['commentjsURL'] = commentjs_url
             # print article['commentjsURL']
         else:
