@@ -51,7 +51,7 @@ class ProfilesSpider(Spider):
         self.database = mysql_auth['database']
         self.host = mysql_auth['host']
         self.port = mysql_auth['port']
-        self.table_name = "comment_list"
+        self.table_name = "st_comments"
 
     # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
@@ -83,7 +83,7 @@ class ProfilesSpider(Spider):
 
                 unicode_display_name = unicode(display_name)
                 profile_url_unicode = self.base_profile_url+unicode_display_name
-                time.sleep(0.1)
+
                 yield scrapy.Request(url=profile_url_unicode, callback=self.get_profile_page, meta={'profileID': profile_id})
 
     def get_profile_page(self, response):

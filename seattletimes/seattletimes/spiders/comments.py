@@ -45,7 +45,7 @@ class CommentSpider(Spider):
         self.database = mysql_auth['database']
         self.host = mysql_auth['host']
         self.port = mysql_auth['port']
-        self.table_name = "article_list"
+        self.table_name = "st_articles"
 
     # Override parse entrypoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
@@ -58,7 +58,9 @@ class CommentSpider(Spider):
         # Add 'LIMIT 200' to query for testing
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + " WHERE DATE(date) >= DATE('2017-03-15')").fetchall()
+            "SELECT articleID,commentjsURL FROM " + self.table_name + "  WHERE date > NOW() - INTERVAL 14 DAY AND "
+                                                                      "commentjsURL <> '' ORDER BY `date` DESC "
+                                                                      "").fetchall()
 
         comment_list_count = len(comment_url_article_list)
         print comment_list_count
@@ -77,8 +79,6 @@ class CommentSpider(Spider):
     def get_comment_pages(self, response):
 
         # Create a dictionary to carry any comments found in init
-        comment_items = []
-        comment_item = {}
         comment_json = json.loads(response.body_as_unicode())
 
         # Set meta for passing to next comment string
@@ -88,14 +88,22 @@ class CommentSpider(Spider):
         comment_head_document = comment_json['headDocument']['content']
         article_url_id = comment_json['collectionSettings']['bootstrapUrl']
 
-
         for com in comment_head_document:
             try:
-                comment_item['bodyHtml'] = com['bodyHtml']
+                comment_item = SeattletimesComment()
+                profile_dict_list = comment_json['headDocument']['authors']
+                comment_item['bodyHtml'] = com['content']['bodyHtml']
                 comment_item['articleID'] = article_id
-                comment_items.append(comment_item)
+                comment_item['id'] = com['content']['id']
+                comment_item['profileID'] = com['content']['authorId']
+                comment_item['parentID'] = com['content']['parentId']
+                comment_item['createdDate'] = com['content']['createdAt']
+                comment_item['displayName'] = profile_dict_list[com['content']['authorId']]['displayName']
+                comment_item['profileURL'] = profile_dict_list[com['content']['authorId']]['profileUrl']
+                # print comment_item
+                yield comment_item
             except KeyError, e:
-                #print('keyerror: ' + str(e))
+                # print('keyerror: ' + str(e))
                 pass
 
         # Extract article meta id
@@ -124,12 +132,14 @@ class CommentSpider(Spider):
 
             # Now yield through the list of URLs
             for n_url in json_n_url_list:
-                yield scrapy.Request(url=n_url, callback=self.parse_comment_tree, meta={'comment_item': comment_items, 'article_id': article_id})
+                yield scrapy.Request(url=n_url, callback=self.parse_comment_tree, meta={'article_id': article_id})
 
         else:
             # print("no comments")
             pass
 
+    # TODO: Convert parse tree to abstracted method for comment dict list
+    # The same comment dict list parser is ran in two different methods
     def parse_comment_tree(self, response):
         print('parse additional comments')
 
@@ -139,7 +149,6 @@ class CommentSpider(Spider):
         # Build the comment dict and test if its available
         comment_dict_list = comment_json['content']
         profile_dict_list = comment_json['authors']
-
 
         if comment_dict_list:
             for item in comment_dict_list:

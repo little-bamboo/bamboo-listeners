@@ -1,15 +1,15 @@
-import scrapy
+from scrapy.spiders import Spider, Request
 from scrapy.utils.markup import remove_tags
 import json
-import re
+
 from datetime import datetime, date
 
 from sbnation.items import SBNationArticle
 
 
-class FieldGullsSpider(scrapy.Spider):
-    name = "fieldgulls"
-    next_flag = True
+class SBNationArticlesSpider(Spider):
+    name = "sbnation-articles"
+
     headers = {
         'Accept': '*/*',
         'Accept-Encoding': 'gzip, deflate, sdch',
@@ -19,36 +19,45 @@ class FieldGullsSpider(scrapy.Spider):
          Chrome/48.0.2564.116 Safari/537.36'
     }
 
+    def __init__(self):
+        # Call super to initialize the instance
+        super(Spider, self).__init__()
+
+        self.domain = 'fieldgulls'
+        self.current_year = 2017
+        self.search_to_year = 2017
+        self.search_to_month = 10
+
     def start_requests(self):
 
         # Build a list of URLs using the search URL and paginating through results
-        search_term = 'seahawks'
-        url = 'http://www.fieldgulls.com/search?order=date&q=' + search_term
-        yield scrapy.Request(url=url, headers=self.headers, callback=self.parse_search)
+        try:
+            while self.current_year >= self.search_to_year:
+                current_month = 12
+                while current_month >= self.search_to_month:
+                    url = 'https://www.' + str(self.domain) + '.com/archives/by_month?month=' + str(current_month) + \
+                          '&year=' + str(self.current_year)
+                    print "URL: {0}".format(url)
+                    yield Request(url=url, headers=self.headers, callback=self.parse)
+                    # print "Current Month: {0} Current Year: {1}".format(current_month, self.current_year)
+                    current_month -= 1
+                self.current_year -= 1
+        except Exception, e:
+            print "Out of Date Range Error: {0}".format(e)
 
-    def parse_search(self, response):
+    def parse(self, response):
 
-        article_links = response.xpath('//div[contains(@class, "c-entry-box--compact--article")]/a/@href').extract()
+        article_links = response.xpath('//h3[contains(@class, "m-full-archive__entry-title")]/a/@href').extract()
 
         for article in article_links:
-            yield scrapy.Request(url=article, headers=self.headers, callback=self.parse_article)
-
-        if self.next_flag:
-            next_page = response.xpath('//a[contains(@class, "c-pagination__next")]/@href').extract()
-
-            try:
-                next_link = 'http://www.fieldgulls.com' + str(next_page[0])
-                print "nextLink: " + next_link
-                yield scrapy.Request(url=next_link, headers=self.headers, callback=self.parse_search)
-            except Exception, e:
-                print "Error: {0}".format(e)
+            yield Request(url=article, headers=self.headers, callback=self.parse_article)
 
     def parse_article(self, response):
         item = SBNationArticle()
 
         title = response.css('h1.c-page-title').extract()
         if title:
-            item['title'] = remove_tags(title[0].encode('utf-8').strip())
+            item['title'] = remove_tags(title[0]).encode('utf-8').strip()
         else:
             item['title'] = 'No Title Found'
 
@@ -80,26 +89,27 @@ class FieldGullsSpider(scrapy.Spider):
             else:
                 item['created_on'] = date.today().strftime('%Y-%m-%d')
         except Exception, e:
-            print"Error datetime conversion: {0}".format(e)
+            # print"Error datetime conversion: {0}".format(e)
+            item['created_on'] = ''
 
         categories = response.css('li.c-entry-group-labels__item a span::text').extract()
 
         if categories:
-            item['categories'] = ','.join(categories)
+            item['categories'] = ','.join(categories).encode('utf-8')
         else:
             item['categories'] = ''
 
-        search_index = response.request.headers.get('Referer', None).split('=')[-1]
+        search_index = self.domain
         if search_index:
             item['search_index'] = search_index
         else:
             item['search_index'] = ''
 
-        cdataId = response.css('div.c-entry-stat--comment ::attr(data-cdata)').extract()
+        cdata_id = response.css('div.c-entry-stat--comment ::attr(data-cdata)').extract()
 
-        if cdataId:
+        if cdata_id:
             # Convert cdataId to a json object, store objects into item
-            cdata = json.loads(cdataId[0])
+            cdata = json.loads(cdata_id[0])
             item['comment_num'] = cdata['comment_count']
             item['recommended_num'] = cdata['recommended_count']
         else:
@@ -109,7 +119,7 @@ class FieldGullsSpider(scrapy.Spider):
         author = response.css('span.c-byline__item a::text').extract()
 
         if author:
-            item['author'] = remove_tags(author[0].encode('utf-8'))
+            item['author'] = remove_tags(author[0]).encode('utf-8').strip()
         else:
             item['author'] = 'No Author'
 

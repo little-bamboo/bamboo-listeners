@@ -68,8 +68,6 @@ class SQLStore(object):
             except MySQLdb.Error, e:
                 print "Error %d: %s" % (e.args[0], e.args[1])
 
-
-
         elif isinstance(item, SeattletimesComment):
             try:
                 self.cursor.execute("""REPLACE INTO st_comments(bodyHtml, articleID, commentID, profileID, parentID, 
@@ -88,7 +86,7 @@ class SQLStore(object):
                 print "Error %d: %s" % (e.args[0], e.args[1])
 
             if item is not None:
-                pprint.pprint(item)
+                print(item)
                 # TODO: Add Kafka topic producer
                 return item
 

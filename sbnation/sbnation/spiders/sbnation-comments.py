@@ -1,34 +1,33 @@
 # -*- coding: utf-8 -*-
-import scrapy
-from scrapy.linkextractors import LinkExtractor
-from scrapy.spiders import CrawlSpider, Rule
+from scrapy.spiders import Spider, Request
 import MySQLdb
 import json
-import urllib2
-
-from datetime import datetime, timedelta
 
 from sbnation.items import SBNationComment, SBNationUser
 
 
-class CommentsSpider(CrawlSpider):
+class SBNationCommentsSpider(Spider):
 
-    name = 'comments'
+    name = 'sbnation-comments'
 
     # TODO: Pass in these values as a command line flag
-    update_recent_articles = True
+    # TODO: Change 'update_recent_articles' to also obtain any new articles
+    # TODO: Refactor get_article_ids and get_comment_article_ids into one method
+    update_recent_articles = False
     get_new_article_comments = False
-    update_all_article_comments = False
+    update_all_article_comments = True
 
     def __init__(self):
+        # Call super to initialize the instance
+        super(Spider, self).__init__()
 
         self.headers = {
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate, sdch',
-        'Accept-Language': 'en-US,en;q=0.8',
-        'Cache-Control': 'max-age=0',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) \
-         Chrome/48.0.2564.116 Safari/537.36'
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, sdch',
+            'Accept-Language': 'en-US,en;q=0.8',
+            'Cache-Control': 'max-age=0',
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) \
+                Chrome/48.0.2564.116 Safari/537.36'
         }
 
         dbauth_file = '../../config/mysqlauth.json'
@@ -37,13 +36,25 @@ class CommentsSpider(CrawlSpider):
         except Exception, e:
             print"DB Auth Error: {0}".format(e)
 
+        self.domain = 'sounderatheart'
+
     def get_article_ids(self):
         # Get list of article IDs to obtain comments from
         try:
 
-            query = "SELECT article_id FROM django.sbn_articles WHERE commentNum > 0 ORDER BY created_on DESC"
-            conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
-                                    charset="utf8mb4", use_unicode=True)
+            query = ("SELECT article_id "
+                     "FROM django.sbn_articles "
+                     "WHERE commentNum > 0 "
+                     "AND search_index='%s' "
+                     "ORDER BY created_on DESC"
+                     % self.domain)
+
+            conn = MySQLdb.connect(user=self.dbauth['user'],
+                                   passwd=self.dbauth['password'],
+                                   db=self.dbauth['database'],
+                                   host=self.dbauth['host'],
+                                   charset="utf8mb4",
+                                   use_unicode=True)
             cursor = conn.cursor()
             cursor.execute(query)
             # Cursor returns a tuple, assign appropriately
@@ -62,27 +73,6 @@ class CommentsSpider(CrawlSpider):
         try:
 
             comment_query = "SELECT article_id FROM django.sbn_comments ORDER BY created_timestamp DESC"
-            conn = MySQLdb.connect(user=self.dbauth['user'], passwd=self.dbauth['password'], db=self.dbauth['database'], host=self.dbauth['host'],
-                                    charset="utf8mb4", use_unicode=True)
-            cursor = conn.cursor()
-            cursor.execute(comment_query)
-            # Cursor returns a tuple, assign appropriately
-            article_ids = cursor.fetchall()
-
-            # Convert list of tuples into list of strings
-            article_ids = [x[0] for x in article_ids]
-            return article_ids
-
-        except Exception, e:
-            print"Error: {0}".format(e)
-
-    def get_recent_articles(self):
-        # TODO:  Query for article IDs that already have comments
-        try:
-
-            last_week = datetime.now() - timedelta(days=14)
-            print last_week
-            comment_query = "SELECT article_id FROM sbn_articles WHERE created_on > NOW() - INTERVAL 7 DAY;"
             conn = MySQLdb.connect(user=self.dbauth['user'],
                                    passwd=self.dbauth['password'],
                                    db=self.dbauth['database'],
@@ -101,13 +91,35 @@ class CommentsSpider(CrawlSpider):
         except Exception, e:
             print"Error: {0}".format(e)
 
+    def get_recent_articles(self):
+        # TODO:  Query for article IDs that already have comments
+        try:
+
+            comment_query = "SELECT article_id FROM sbn_articles WHERE created_on > NOW() - INTERVAL 14 DAY;"
+            conn = MySQLdb.connect(user=self.dbauth['user'],
+                                   passwd=self.dbauth['password'],
+                                   db=self.dbauth['database'],
+                                   host=self.dbauth['host'],
+                                   charset="utf8mb4",
+                                   use_unicode=True)
+            cursor = conn.cursor()
+            cursor.execute(comment_query)
+            # Cursor returns a tuple, assign appropriately
+            article_ids = cursor.fetchall()
+
+            # Convert list of tuples into list of strings
+            article_ids = [x[0] for x in article_ids]
+            return article_ids
+
+        except Exception, e:
+            print"Error: {0}".format(e)
 
     def start_requests(self):
 
         # Run query on existing database to pull all article IDs
         # iterate through each id and yield scrapy request
 
-        # TODO: Refactor get article IDs methods to a single method
+        # TODO: Refactor get article IDs methods to a single method or refactor to dictionary
         if self.get_new_article_comments:
             article_ids = set(self.get_article_ids())
             comment_article_ids = set(self.get_comment_article_ids())
@@ -121,23 +133,22 @@ class CommentsSpider(CrawlSpider):
         elif self.update_all_article_comments:
             # TODO: Query for all article IDs
             print 'updating comments for all articles'
-
+            get_article_ids = self.get_article_ids()
 
         for article_id in get_article_ids:
 
             # Build URL
-            commentjsURL = 'https://www.fieldgulls.com/comments/load_comments/' + str(article_id)
-            yield scrapy.Request(url=commentjsURL, headers=self.headers, callback=self.parse_comments)
+            commentjs_url = 'https://www.' + self.domain + '.com/comments/load_comments/' + str(article_id)
+            yield Request(url=commentjs_url, headers=self.headers, callback=self.parse)
 
-    def parse_comments(self, response):
-
-        item = SBNationComment()
+    def parse(self, response):
 
         # item = SBNationComment()
         # Convert response from json to dictionary
         comment_dict = json.loads(response.text)
 
         for comment in comment_dict['comments']:
+            item = SBNationComment()
             # print comment
 
             comment_id = comment['id']
@@ -190,25 +201,25 @@ class CommentsSpider(CrawlSpider):
 
             body = comment['body']
             if body:
-                item['body'] = body
+                item['body'] = body.encode('utf-8').strip()
             else:
                 item['body'] = ''
 
             username = comment['username']
             if username:
-                item['username'] = username
+                item['username'] = username.encode('utf-8').strip()
             else:
                 item['username'] = ''
 
             title = comment['title']
             if title:
-                item['title'] = title
+                item['title'] = title.encode('utf-8').strip()
             else:
                 item['title'] = ''
 
             signature = comment['signature']
             if signature:
-                item['signature'] = signature
+                item['signature'] = signature.encode('utf-8').strip()
             else:
                 item['signature'] = ''
 
@@ -226,7 +237,7 @@ class CommentsSpider(CrawlSpider):
             user_item = SBNationUser()
             username = user['username']
             if username:
-                user_item['username'] = username
+                user_item['username'] = username.encode('utf-8')
             else:
                 user_item['username'] = ''
 

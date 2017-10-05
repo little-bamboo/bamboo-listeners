@@ -90,8 +90,10 @@ class SeattleTimesSpider(Spider):
         # Standard division using int values loses precision.  Converting values to float and round with ceiling
         page_total = int(math.ceil(float(init_req['total']) / float(self.perpage)))
         print"Search API Page Total: {0}".format(page_total)
+
         while page_num <= page_total:
             time.sleep(2)
+            print"Search API Page Num: {0}".format(page_num)
             # Example: http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search? \
             # query=the&startdate=2017-01-01&enddate=2017-10-01&sortby=mostrecent&page=1&perpage=200
 
@@ -104,7 +106,7 @@ class SeattleTimesSpider(Spider):
 
             # Increment page_num as this is the second call
             page_num += 1
-            print"Search API Page Num: {0}".format(page_num)
+
             yield scrapy.Request(url=new_url, headers=self.headers, callback=self.obtain_articles_from_search)
 
     def obtain_articles_from_search(self, response):

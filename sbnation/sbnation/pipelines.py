@@ -10,6 +10,7 @@ import json
 import MySQLdb
 import logging
 import sys
+import datetime
 
 
 class SbnationPipeline(object):
@@ -36,7 +37,10 @@ class SbnationPipeline(object):
     def process_item(self, item, spider):
         if isinstance(item, SBNationArticle):
             try:
-                print "Committing article_id: {0}".format(item['article_id'])
+                print "Committing article_id: {0} created_on: {1} search_index: {2} title: {3}".format(item['article_id'],
+                                                                                item['created_on'],
+                                                                                item['search_index'],
+                                                                                item['title'])
 
                 # Commit main profile record
                 self.cursor.execute("""REPLACE INTO sbn_articles (title, body, created_on, url, search_index, article_id, 
@@ -65,7 +69,14 @@ class SbnationPipeline(object):
 
         elif isinstance(item, SBNationComment):
             try:
-                print "Committing commentID: {0}".format(item['id'])
+                readable_date = datetime.datetime.fromtimestamp(item['created_timestamp'])
+
+                print "Committing commentID: {0} created_on: {1} article_id: {2} username: {3} title: {4}"\
+                    .format(item['id'],
+                            readable_date.strftime('%Y-%m-%d %H:%M:%S'),
+                            item['article_id'],
+                            item['username'],
+                            item['title'])
 
                 # Commit comment record
                 self.cursor.execute("""REPLACE INTO sbn_comments (id, parent_id, user_id, spam_flags, troll_flags, 
