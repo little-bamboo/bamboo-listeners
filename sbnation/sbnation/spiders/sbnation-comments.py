@@ -13,9 +13,9 @@ class SBNationCommentsSpider(Spider):
     # TODO: Pass in these values as a command line flag
     # TODO: Change 'update_recent_articles' to also obtain any new articles
     # TODO: Refactor get_article_ids and get_comment_article_ids into one method
-    update_recent_articles = False
+    update_recent_articles = True
     get_new_article_comments = False
-    update_all_article_comments = True
+    update_all_article_comments = False
 
     def __init__(self):
         # Call super to initialize the instance
@@ -72,7 +72,8 @@ class SBNationCommentsSpider(Spider):
         # TODO:  Query for article IDs that already have comments
         try:
 
-            comment_query = "SELECT article_id FROM django.sbn_comments ORDER BY created_timestamp DESC"
+            comment_query = "SELECT article_id FROM django.sbn_comments;"
+
             conn = MySQLdb.connect(user=self.dbauth['user'],
                                    passwd=self.dbauth['password'],
                                    db=self.dbauth['database'],
@@ -95,7 +96,12 @@ class SBNationCommentsSpider(Spider):
         # TODO:  Query for article IDs that already have comments
         try:
 
-            comment_query = "SELECT article_id FROM sbn_articles WHERE created_on > NOW() - INTERVAL 14 DAY;"
+            comment_query = ("SELECT article_id "
+                             "FROM django.sbn_articles "
+                             "WHERE search_index='%s' "
+                             "AND created_on > NOW() - INTERVAL 14 DAY;"
+                             % self.domain)
+
             conn = MySQLdb.connect(user=self.dbauth['user'],
                                    passwd=self.dbauth['password'],
                                    db=self.dbauth['database'],

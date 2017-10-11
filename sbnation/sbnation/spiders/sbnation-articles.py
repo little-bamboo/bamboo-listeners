@@ -23,7 +23,7 @@ class SBNationArticlesSpider(Spider):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
-        self.domain = 'fieldgulls'
+        self.domain = 'sounderatheart'
         self.current_year = 2017
         self.search_to_year = 2017
         self.search_to_month = 10
