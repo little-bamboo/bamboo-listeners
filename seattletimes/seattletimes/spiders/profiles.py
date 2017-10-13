@@ -68,8 +68,16 @@ class ProfilesSpider(Spider):
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         display_name_list = conn.execute("SELECT DISTINCT displayName, profileID, profileURL FROM " + self.table_name + "").fetchall()
 
+        existing_profiles = conn.execute("SELECT DISTINCT profileID FROM st_profiles")
+        existing_profiles_list = [unicode(x[0]) for x in existing_profiles]
+
+        # Filter out existing profiles from display_name_list
+        profile_names = [x for x in display_name_list if unicode(x[1]) not in existing_profiles_list]
+
+        print profile_names
+
         counter = 0
-        for item in display_name_list:
+        for item in profile_names:
 
             display_name = item[0]
             profile_id = item[1]

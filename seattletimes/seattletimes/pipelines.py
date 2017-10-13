@@ -22,9 +22,9 @@ class SQLStore(object):
 
         try:
             dbauth = json.loads(open(dbauth_file, 'r').read())
-            print(dbauth)
+
             self.username = dbauth['user']
-            print(self.username)
+
             self.password = dbauth['password']
             self.database = dbauth['database']
             self.host = dbauth['host']
@@ -103,6 +103,7 @@ class SQLStore(object):
                                      item['profileID'],
                                      item['profileUrl']))
                 self.conn.commit()
+                print "Committed User: {0}".format(item['displayName'])
 
             except MySQLdb.Error, e:
                 print "Error %d: %s" % (e.args[0], e.args[1])

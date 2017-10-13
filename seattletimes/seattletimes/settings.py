@@ -15,7 +15,7 @@
 # HTTPCACHE_STORAGE = 'scrapy_splash.SplashAwareFSCacheStorage'
 
 # User Defined:
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'WARNING'
 # FEED_EXPORTERS = {
 # 	'jsonlines': 'scrapy.contrib.exporter.JsonLinesItemExporter',
 # }

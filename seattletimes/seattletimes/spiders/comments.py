@@ -36,7 +36,6 @@ class CommentSpider(Spider):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
-        print("sqlalchemy version: " + str(sqlalchemy.__version__))
         self.app_name = "comments"
 
         mysql_auth = json.loads(open(mysqlauth, 'r').read())
@@ -58,7 +57,7 @@ class CommentSpider(Spider):
         # Add 'LIMIT 200' to query for testing
         # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + "  WHERE date > NOW() - INTERVAL 14 DAY AND "
+            "SELECT articleID,commentjsURL FROM " + self.table_name + "  WHERE date > NOW() - INTERVAL 3 DAY AND "
                                                                       "commentjsURL <> '' ORDER BY `date` DESC "
                                                                       "").fetchall()
 

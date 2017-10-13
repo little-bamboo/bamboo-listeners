@@ -4,8 +4,12 @@
 from scrapy.spiders import Spider
 import scrapy
 from scrapy.utils.markup import remove_tags
-from scrapy.settings import default_settings
+import xml.etree.ElementTree as ET
+
+import sqlalchemy
+
 import requests
+import logging
 
 import json
 from urlparse import urlparse
@@ -41,9 +45,20 @@ class SeattleTimesSpider(Spider):
         'Accept-Charset': 'utf-8'
     }
 
+    custom_settings = {"HTTPS_PROXY":"http://brian.schaper:Sounders17!@ec2-54-214-228-124.us-west-2.compute.amazonaws.com:8888",
+                       "HTTP_PROXY":"http://brian.schaper:Sounders17!@ec2-54-214-228-124.us-west-2.compute.amazonaws.com:8888"}
+
     # Call super and initialize external variables
-    # http://vendorapi.seattletimes.com/st/proxy-api/v1.0/st_search/search?query=the&startdate=2017-06-19&enddate=2017-09-19&sortby=mostrecent&page=1&perpage=20
-    def __init__(self, startdate='', enddate='', search='*', perpage='200', datapath='', username='briansc@gmail.com', password='thomas7'):
+    def __init__(self,
+                 startdate='',
+                 enddate='',
+                 search='*',
+                 perpage='200',
+                 datapath='',
+                 username='briansc@gmail.com',
+                 password='thomas7',
+                 mysqlauth='../../config/mysqlauth.json'):
+
         # Call super to initialize the instance
         super(Spider, self).__init__()
         self.startdate = startdate
@@ -61,6 +76,18 @@ class SeattleTimesSpider(Spider):
         self.articleCount = 1
         self.filename = "seattletimes" + '_' + self.searchterm + '_' + self.startdate + '-' + self.enddate
 
+        # print("sqlalchemy version: " + str(sqlalchemy.__version__))
+        self.app_name = "comments"
+
+        mysql_auth = json.loads(open(mysqlauth, 'r').read())
+        self.dbuser = mysql_auth['user']
+        self.dbpassword = mysql_auth['password']
+        self.database = mysql_auth['database']
+        self.dbhost = mysql_auth['host']
+        self.dbport = mysql_auth['port']
+        self.dbtable_name = "st_articles"
+
+        time.sleep(3)
 
     # Override parse endpoint into the class that begins the event flow once a response from the start_urls
     def parse(self, response):
@@ -68,8 +95,41 @@ class SeattleTimesSpider(Spider):
         return scrapy.FormRequest.from_response(
             response,
             formdata={'username': self.username, 'password': self.password},
-            callback=self.auth_login
+            callback=self.auth_rss
         )
+
+    def auth_rss(self, response):
+        """Code to obtain latest articles from RSS feed
+        """
+        engine = sqlalchemy.create_engine(
+            'mysql+mysqlconnector://' + self.dbuser + ':' + self.dbpassword + '@' + self.dbhost + ':' + self.dbport +
+            '/' + self.database)
+        conn = engine.connect()
+
+        # Pull articles from previous 2 days to filter out URLs we've already collected
+        articleurl_list = conn.execute("SELECT articleURL FROM " + self.dbtable_name + " WHERE date > NOW() - "
+                                                                                       "INTERVAL 2 DAY").fetchall()
+        url_list = [url[0] for url in articleurl_list]
+
+        # Build response object for rss feed using requests and assign content
+        rss_response = requests.get('https://www.seattletimes.com/feed/')
+        rss_text = rss_response.content
+
+        # Use ElementTree to easily parse XML feed content and convert all links to list
+        try:
+            root = ET.fromstring(rss_text)
+            root_links = root.findall('.//link')
+            raw_links = [link.text for link in root_links]
+            # Remove first link (it is just the standar www.seattletimes.com site)
+            raw_links.pop(0)
+            clean_links = [link.split('?')[0] for link in raw_links]
+            new_urls = list(set(clean_links) - set(url_list))
+
+            for rss_url in new_urls:
+                yield scrapy.Request(url=rss_url, headers=self.headers, callback=self.process_article)
+
+        except Exception, e:
+            print "Exception: {0}".format(e.message)
 
     # Obtain the response from the login and yield the search request
     def auth_login(self, response):
