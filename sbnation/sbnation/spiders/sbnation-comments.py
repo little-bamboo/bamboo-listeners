@@ -10,14 +10,7 @@ class SBNationCommentsSpider(Spider):
 
     name = 'sbnation-comments'
 
-    # TODO: Pass in these values as a command line flag
-    # TODO: Change 'update_recent_articles' to also obtain any new articles
-    # TODO: Refactor get_article_ids and get_comment_article_ids into one method
-    update_recent_articles = True
-    get_new_article_comments = False
-    update_all_article_comments = False
-
-    def __init__(self):
+    def __init__(self, domain=''):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
@@ -36,61 +29,7 @@ class SBNationCommentsSpider(Spider):
         except Exception, e:
             print"DB Auth Error: {0}".format(e)
 
-        self.domain = 'sounderatheart'
-
-    def get_article_ids(self):
-        # Get list of article IDs to obtain comments from
-        try:
-
-            query = ("SELECT article_id "
-                     "FROM django.sbn_articles "
-                     "WHERE commentNum > 0 "
-                     "AND search_index='%s' "
-                     "ORDER BY created_on DESC"
-                     % self.domain)
-
-            conn = MySQLdb.connect(user=self.dbauth['user'],
-                                   passwd=self.dbauth['password'],
-                                   db=self.dbauth['database'],
-                                   host=self.dbauth['host'],
-                                   charset="utf8mb4",
-                                   use_unicode=True)
-            cursor = conn.cursor()
-            cursor.execute(query)
-            # Cursor returns a tuple, assign appropriately
-            article_ids = cursor.fetchall()
-
-            # Convert list of tuples into list of strings
-            article_ids = [x[0] for x in article_ids]
-            return article_ids
-
-        except Exception, e:
-            print"Error: {0}".format(e)
-
-    def get_comment_article_ids(self):
-
-        # TODO:  Query for article IDs that already have comments
-        try:
-
-            comment_query = "SELECT article_id FROM django.sbn_comments;"
-
-            conn = MySQLdb.connect(user=self.dbauth['user'],
-                                   passwd=self.dbauth['password'],
-                                   db=self.dbauth['database'],
-                                   host=self.dbauth['host'],
-                                   charset="utf8mb4",
-                                   use_unicode=True)
-            cursor = conn.cursor()
-            cursor.execute(comment_query)
-            # Cursor returns a tuple, assign appropriately
-            article_ids = cursor.fetchall()
-
-            # Convert list of tuples into list of strings
-            article_ids = [x[0] for x in article_ids]
-            return article_ids
-
-        except Exception, e:
-            print"Error: {0}".format(e)
+        self.domain = domain
 
     def get_recent_articles(self):
         # TODO:  Query for article IDs that already have comments
@@ -122,28 +61,11 @@ class SBNationCommentsSpider(Spider):
 
     def start_requests(self):
 
-        # Run query on existing database to pull all article IDs
-        # iterate through each id and yield scrapy request
+        get_article_ids = self.get_recent_articles()
 
-        # TODO: Refactor get article IDs methods to a single method or refactor to dictionary
-        if self.get_new_article_comments:
-            article_ids = set(self.get_article_ids())
-            comment_article_ids = set(self.get_comment_article_ids())
-            get_article_ids = article_ids - comment_article_ids
-
-        elif self.update_recent_articles:
-            # TODO: Query for articles for the past two weeks
-            print 'updating comments from articles over last two weeks'
-            get_article_ids = self.get_recent_articles()
-
-        elif self.update_all_article_comments:
-            # TODO: Query for all article IDs
-            print 'updating comments for all articles'
-            get_article_ids = self.get_article_ids()
+        print 'Updating comments from articles over last two weeks.  Count: {0}'.format(str(len(get_article_ids)))
 
         for article_id in get_article_ids:
-
-            # Build URL
             commentjs_url = 'https://www.' + self.domain + '.com/comments/load_comments/' + str(article_id)
             yield Request(url=commentjs_url, headers=self.headers, callback=self.parse)
 

@@ -6,6 +6,8 @@ from datetime import datetime, date
 
 from sbnation.items import SBNationArticle
 
+from sqlalchemy import create_engine
+
 
 class SBNationArticlesSpider(Spider):
     name = "sbnation-articles"
@@ -19,14 +21,43 @@ class SBNationArticlesSpider(Spider):
          Chrome/48.0.2564.116 Safari/537.36'
     }
 
-    def __init__(self):
+    def __init__(self, domain='', mysqlauth='../../config/mysqlauth.json'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
-        self.domain = 'fieldgulls'
-        self.current_year = 2017
-        self.search_to_year = 2017
-        self.search_to_month = 10
+        self.domain = domain
+        self.current_year = datetime.now().year
+        self.search_to_year = datetime.now().year
+        self.search_to_month = datetime.now().month
+
+        mysql_auth = json.loads(open(mysqlauth, 'r').read())
+        self.user = mysql_auth['user']
+        self.password = mysql_auth['password']
+        self.database = mysql_auth['database']
+        self.host = mysql_auth['host']
+        self.port = mysql_auth['port']
+        self.table_name = "sbn_articles"
+
+    def get_current_articles(self):
+
+        # Get table column for articleid and commentjsurl
+
+        print ("reading articles table for comment URL list")
+        engine = create_engine('mysql+mysqlconnector://' +
+                               self.user + ':' +
+                               self.password + '@' +
+                               self.host + ':' +
+                               self.port + '/' +
+                               self.database)
+        conn = engine.connect()
+
+        # Add 'LIMIT 200' to query for testing
+        url_article_list = conn.execute(
+            "SELECT url FROM " + self.table_name + "  WHERE search_index='" + self.domain +
+            "' AND created_on > NOW() - INTERVAL 30 DAY").fetchall()
+
+        article_list = [x[0] for x in url_article_list]
+        return article_list
 
     def start_requests(self):
 
@@ -49,7 +80,11 @@ class SBNationArticlesSpider(Spider):
 
         article_links = response.xpath('//h3[contains(@class, "m-full-archive__entry-title")]/a/@href').extract()
 
-        for article in article_links:
+        existing_articles = self.get_current_articles()
+
+        articles = set(article_links) - set(existing_articles)
+
+        for article in articles:
             yield Request(url=article, headers=self.headers, callback=self.parse_article)
 
     def parse_article(self, response):
