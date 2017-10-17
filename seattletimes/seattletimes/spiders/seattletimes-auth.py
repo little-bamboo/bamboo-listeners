@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 import sqlalchemy
 
 import requests
-import logging
 
 import json
 from urlparse import urlparse

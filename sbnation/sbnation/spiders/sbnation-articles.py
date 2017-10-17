@@ -122,10 +122,10 @@ class SBNationArticlesSpider(Spider):
                 # Sample: Sep 12, 2017,  8:00am PDT
                 item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M%p')
             else:
-                item['created_on'] = date.today().strftime('%Y-%m-%d')
+                item['created_on'] = datetime.now().strftime("%Y-%m-%d %H:%M")
         except Exception, e:
             # print"Error datetime conversion: {0}".format(e)
-            item['created_on'] = ''
+            item['created_on'] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         categories = response.css('li.c-entry-group-labels__item a span::text').extract()
 
