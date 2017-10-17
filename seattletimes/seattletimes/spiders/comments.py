@@ -19,6 +19,8 @@ class CommentSpider(Spider):
     allowed_domains = ['seattletimes.com', 'data.livefyre.com']
     start_urls = ['https://secure.seattletimes.com/accountcenter/login']
 
+    custom_settings = {'DOWNLOAD_DELAY': '0.1'}
+
     full_pattern = re.compile('[^a-zA-Z0-9\\\/]|_')
 
     headers = {
@@ -32,7 +34,7 @@ class CommentSpider(Spider):
     }
 
     # Call super and initialize external variables
-    def __init__(self, date='', search='', datapath='', mysqlauth='../../config/mysqlauth.json'):
+    def __init__(self, mysqlauth='../../config/mysqlauth.json'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
@@ -51,13 +53,17 @@ class CommentSpider(Spider):
         # Get table column for articleid and commentjsurl
 
         print ("reading articles table for comment URL list")
-        engine = create_engine('mysql+mysqlconnector://'+self.user+':'+self.password+'@'+self.host+':'+self.port+'/'+self.database)
+        engine = create_engine('mysql+mysqlconnector://' +
+                               self.user+':' +
+                               self.password+'@' +
+                               self.host+':' +
+                               self.port+'/' +
+                               self.database)
         conn = engine.connect()
 
         # Add 'LIMIT 200' to query for testing
-        # TODO:  Incorporate command line variables for sql date, sort, where articleid=xyz
         comment_url_article_list = conn.execute(
-            "SELECT articleID,commentjsURL FROM " + self.table_name + "  WHERE date > NOW() - INTERVAL 3 DAY AND "
+            "SELECT articleID,commentjsURL FROM " + self.table_name + "  WHERE date > NOW() - INTERVAL 7 DAY AND "
                                                                       "commentjsURL <> '' ORDER BY `date` DESC "
                                                                       "").fetchall()
 
@@ -84,58 +90,14 @@ class CommentSpider(Spider):
         # Stored in the articleid
         article_id = response.meta['articleid']
 
-        comment_head_document = comment_json['headDocument']['content']
-        article_url_id = comment_json['collectionSettings']['bootstrapUrl']
-
-        for com in comment_head_document:
-            try:
-                comment_item = SeattletimesComment()
-                profile_dict_list = comment_json['headDocument']['authors']
-                comment_item['bodyHtml'] = com['content']['bodyHtml']
-                comment_item['articleID'] = article_id
-                comment_item['id'] = com['content']['id']
-                comment_item['profileID'] = com['content']['authorId']
-                comment_item['parentID'] = com['content']['parentId']
-                comment_item['createdDate'] = com['content']['createdAt']
-                comment_item['displayName'] = profile_dict_list[com['content']['authorId']]['displayName']
-                comment_item['profileURL'] = profile_dict_list[com['content']['authorId']]['profileUrl']
-                # print comment_item
-                yield comment_item
-            except KeyError, e:
-                # print('keyerror: ' + str(e))
-                pass
-
-        # Extract article meta id
-        parsed_url = article_url_id.split('/')
-        post_id_base64 = str(parsed_url[3])
-
-        com_pages = comment_json['collectionSettings']['archiveInfo']['nPages']
         com_page_info = comment_json['collectionSettings']['archiveInfo']['pageInfo']
 
-        if com_page_info and com_pages:
-            # We can assume the page has comments, make sure they get passed
-
-            # Build the list of URLs to parse  We will use the init to build the list
-            # Init will also be passed as this first step doesn't return an item
-            json_n_url_list = []
-            json_n_url_list.append(response.url)
-
-            # Build the iterator using the number supplied in the json feed
-            for val in range(com_pages):
-                page_number = str(val)
-                print("Page #: " + str(page_number))
-
-                # Now use the post id and page num to build the URL that will be stored in the url list
-                json_n_url = 'http://data.livefyre.com/bs3/v3.1/seattletimes.fyre.co/316317/' + post_id_base64 + '/' + page_number + '.json'
-                json_n_url_list.append(json_n_url)
-
-            # Now yield through the list of URLs
-            for n_url in json_n_url_list:
-                yield scrapy.Request(url=n_url, callback=self.parse_comment_tree, meta={'article_id': article_id})
-
-        else:
-            # print("no comments")
-            pass
+        # If there are additional pages of comments, make sure they get passed
+        base_url = 'http://data.livefyre.com/bs3/v3.1'
+        for k, v in com_page_info.iteritems():
+            com_url = base_url + v['url']
+            print com_url
+            yield scrapy.Request(url=com_url, callback=self.parse_comment_tree, meta={'article_id': article_id})
 
     # TODO: Convert parse tree to abstracted method for comment dict list
     # The same comment dict list parser is ran in two different methods
