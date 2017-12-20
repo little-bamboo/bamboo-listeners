@@ -17,7 +17,7 @@ date_string = datetime.now().strftime("%Y%m%d")
 filename = 'pappini_' + date_string + '.csv'
 
 with open(filename, 'w') as pappinifile:
-    writer = csv.writer(pappinifile, delimiter='|', quotechar='"')
+    writer = csv.writer(pappinifile, delimiter=',', quotechar='"')
     writer.writerow(
         ["row",
          "id",
