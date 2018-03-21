@@ -1,1 +1,4 @@
-./* linguist-vendored=false
+sbnation/ linguist-vendored=false
+seattletimes/ linguist-vendor=false
+nytimes/ linguist-vendor=false
+cruisecritic/ linguist-vendor=false
