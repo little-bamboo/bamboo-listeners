@@ -66,8 +66,8 @@ class SBNationArticlesSpider(Spider):
             while self.current_year >= self.search_to_year:
                 current_month = 12
                 while current_month >= self.search_to_month:
-                    url = 'https://www.' + str(self.domain) + '.com/archives/by_month?month=' + str(current_month) + \
-                          '&year=' + str(self.current_year)
+                    url = 'https://www.' + str(self.domain) + '.com/archives/' + str(self.current_year) + '/' + str(
+                        current_month)
                     print "URL: {0}".format(url)
                     yield Request(url=url, headers=self.headers, callback=self.parse)
                     # print "Current Month: {0} Current Year: {1}".format(current_month, self.current_year)
@@ -78,7 +78,7 @@ class SBNationArticlesSpider(Spider):
 
     def parse(self, response):
 
-        article_links = response.xpath('//h3[contains(@class, "m-full-archive__entry-title")]/a/@href').extract()
+        article_links = response.xpath('//h2[contains(@class, "c-entry-box--compact__title")]/a/@href').extract()
 
         existing_articles = self.get_current_articles()
 
@@ -87,10 +87,12 @@ class SBNationArticlesSpider(Spider):
         for article in articles:
             yield Request(url=article, headers=self.headers, callback=self.parse_article)
 
+        
+
     def parse_article(self, response):
         item = SBNationArticle()
 
-        title = response.css('h1.c-page-title').extract()
+        title = response.css('title').extract()
         if title:
             item['title'] = remove_tags(title[0]).encode('utf-8').strip()
         else:
