@@ -1,10 +1,10 @@
-##Overview
+## Overview
 Bamboo Listeners is a python based project utilizing scrapy to periodically ingest data collected from various websites. 
-###Installation
+### Installation
 Install using the supplied requirements.txt
     cd ~/project-folder
     pip install -r requirements.txt
-###Usage
+### Usage
 
 The Bamboo Listeners requires a mysql backend with tables constructed to consume results.  Visit each scrapy pipeline to edit, update, view required fields.
 
