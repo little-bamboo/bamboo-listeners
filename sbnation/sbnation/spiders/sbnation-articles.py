@@ -2,7 +2,7 @@ from scrapy.spiders import Spider, Request
 from scrapy.utils.markup import remove_tags
 import json
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from sbnation.items import SBNationArticle
 
@@ -21,14 +21,14 @@ class SBNationArticlesSpider(Spider):
          Chrome/48.0.2564.116 Safari/537.36'
     }
 
-    def __init__(self, domain='', mysqlauth='../../config/mysqlauth.json'):
+    def __init__(self, domain='', current_year='', current_month='', mysqlauth='../../config/sbnation_auth.json'):
         # Call super to initialize the instance
         super(Spider, self).__init__()
 
         self.domain = domain
         self.current_year = datetime.now().year
         self.search_to_year = datetime.now().year
-        self.search_to_month = datetime.now().month
+        self.search_to_month = 2
 
         mysql_auth = json.loads(open(mysqlauth, 'r').read())
         self.user = mysql_auth['user']
@@ -37,6 +37,12 @@ class SBNationArticlesSpider(Spider):
         self.host = mysql_auth['host']
         self.port = mysql_auth['port']
         self.table_name = "sbn_articles"
+
+        self.existing_articles = self.get_current_articles()
+
+    def date_range(self, start_date, end_date):
+        for n in range(int((end_date - start_date).days)):
+            yield start_date + timedelta(n)
 
     def get_current_articles(self):
 
@@ -54,7 +60,7 @@ class SBNationArticlesSpider(Spider):
         # Add 'LIMIT 200' to query for testing
         url_article_list = conn.execute(
             "SELECT url FROM " + self.table_name + "  WHERE search_index='" + self.domain +
-            "' AND created_on > NOW() - INTERVAL 30 DAY").fetchall()
+            "' AND created_on > NOW() - INTERVAL 180 DAY").fetchall()
 
         article_list = [x[0] for x in url_article_list]
         return article_list
@@ -63,16 +69,17 @@ class SBNationArticlesSpider(Spider):
 
         # Build a list of URLs using the search URL and paginating through results
         try:
-            while self.current_year >= self.search_to_year:
-                current_month = 12
-                while current_month >= self.search_to_month:
-                    url = 'https://www.' + str(self.domain) + '.com/archives/' + str(self.current_year) + '/' + str(
-                        current_month)
-                    print "URL: {0}".format(url)
-                    yield Request(url=url, headers=self.headers, callback=self.parse)
-                    # print "Current Month: {0} Current Year: {1}".format(current_month, self.current_year)
-                    current_month -= 1
-                self.current_year -= 1
+
+            start_date = date(2018, 1, 1)
+            end_date = date(2018, 5, 1)
+
+            dates = self.date_range(start_date, end_date)
+
+            for single_date in dates:
+                url = 'https://www.' + str(self.domain) + '.com/archives/' + single_date.strftime("%Y").lstrip(
+                    "0") + '/' + single_date.strftime("%m").lstrip("0") + '/' + single_date.strftime("%d").lstrip("0")
+                print url
+                yield Request(url=url, headers=self.headers, callback=self.parse)
         except Exception, e:
             print "Out of Date Range Error: {0}".format(e)
 
@@ -80,14 +87,11 @@ class SBNationArticlesSpider(Spider):
 
         article_links = response.xpath('//h2[contains(@class, "c-entry-box--compact__title")]/a/@href').extract()
 
-        existing_articles = self.get_current_articles()
-
-        articles = set(article_links) - set(existing_articles)
+        # Ensure that we only collect articles we don't yet have
+        articles = set(article_links) - set(self.existing_articles)
 
         for article in articles:
             yield Request(url=article, headers=self.headers, callback=self.parse_article)
-
-        
 
     def parse_article(self, response):
         item = SBNationArticle()
@@ -104,17 +108,18 @@ class SBNationArticlesSpider(Spider):
         else:
             item['body'] = 'No body text found'
 
-        article_id = response.css('body ::attr(data-entry-id)').extract()
-        if article_id:
-            item['article_id'] = article_id[0]
-        else:
-            item['article_id'] = ''
-
         article_url = response.url
         if article_url:
             item['url'] = article_url
         else:
             item['url'] = ''
+
+        article_id = response.css('body ::attr(data-entry-id)').extract()
+        if article_id:
+            item['article_id'] = article_id[0]
+        else:
+            print article_url.rsplit('/')[-2]
+            item['article_id'] = article_url.rsplit('/')[-2]
 
         try:
             raw_date = response.css('time::text')[0].extract().strip()
@@ -124,10 +129,19 @@ class SBNationArticlesSpider(Spider):
                 # Sample: Sep 12, 2017,  8:00am PDT
                 item['created_on'] = datetime.strptime(' '.join(new_date), '%b %d, %Y, %I:%M%p')
             else:
-                item['created_on'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                day = article_url.rsplit('/')[-3]
+                month = article_url.rsplit('/')[-4]
+                year = article_url.rsplit('/')[-5]
+                date_from_url = date(year, month, day)
+                item['created_on'] = date_from_url
         except Exception, e:
             # print"Error datetime conversion: {0}".format(e)
-            item['created_on'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            # item['created_on'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            day = article_url.rsplit('/')[-3]
+            month = article_url.rsplit('/')[-4]
+            year = article_url.rsplit('/')[-5]
+            date_from_url = date(int(year), int(month), int(day))
+            item['created_on'] = date_from_url
 
         categories = response.css('li.c-entry-group-labels__item a span::text').extract()
 

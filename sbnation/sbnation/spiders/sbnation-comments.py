@@ -7,7 +7,6 @@ from sbnation.items import SBNationComment, SBNationUser
 
 
 class SBNationCommentsSpider(Spider):
-
     name = 'sbnation-comments'
 
     def __init__(self, domain=''):
@@ -23,7 +22,7 @@ class SBNationCommentsSpider(Spider):
                 Chrome/48.0.2564.116 Safari/537.36'
         }
 
-        dbauth_file = '../../config/mysqlauth.json'
+        dbauth_file = '../../config/sbnation_auth.json'
         try:
             self.dbauth = json.loads(open(dbauth_file, 'r').read())
         except Exception, e:
@@ -36,9 +35,9 @@ class SBNationCommentsSpider(Spider):
         try:
 
             comment_query = ("SELECT article_id "
-                             "FROM django.sbn_articles "
+                             "FROM sb_nation.sbn_articles "
                              "WHERE search_index='%s' "
-                             "AND created_on > NOW() - INTERVAL 14 DAY;"
+                             "AND created_on > NOW() - INTERVAL 120 DAY;"
                              % self.domain)
 
             conn = MySQLdb.connect(user=self.dbauth['user'],

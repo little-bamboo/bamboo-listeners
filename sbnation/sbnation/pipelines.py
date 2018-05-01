@@ -18,7 +18,7 @@ class SbnationPipeline(object):
     def __init__(self):
 
         # Pull credentials from config directory for database
-        dbauth_file = '../../config/mysqlauth.json'
+        dbauth_file = '../../config/sbnation_auth.json'
 
         try:
             self.dbauth = json.loads(open(dbauth_file, 'r').read())
